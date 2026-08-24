@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CommitPulse AI — AI That Finds the Work Hiding Inside Your Conversations</title>
+  <meta name="description" content="Dedicated AI commitment-detection layer that finds hidden work inside Slack, Email, and Meeting transcripts before it gets lost.">
+  <link rel="stylesheet" href="css/styles.css">
+  <!-- Chart.js for Team Reliability & Conversion Visualizations -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- Master Header -->
+    <header class="app-header">
+      <div class="brand-section">
+        <div class="brand-logo">⚡</div>
+        <div>
+          <div class="brand-name">CommitPulse AI</div>
+          <div class="brand-tagline">AI that finds the work hiding inside your conversations</div>
+        </div>
+      </div>
+
+      <!-- Main Navigation Tabs -->
+      <nav class="main-nav-tabs">
+        <button class="nav-tab-btn active" data-tab="tab-dashboard">
+          📊 Dashboard
+        </button>
+        <button class="nav-tab-btn" data-tab="tab-inbox">
+          📥 AI Inbox <span class="nav-badge" id="navInboxBadge">4</span>
+        </button>
+        <button class="nav-tab-btn" data-tab="tab-tasks">
+          📋 My Tasks <span class="nav-badge" id="navTasksBadge" style="background: var(--color-accent);">5</span>
+        </button>
+        <button class="nav-tab-btn" data-tab="tab-history">
+          📜 History & Audit
+        </button>
+        <button class="nav-tab-btn" data-tab="tab-analytics">
+          📈 Team Analytics
+        </button>
+        <button class="nav-tab-btn" data-tab="tab-pricing">
+          💎 Pricing Plans
+        </button>
+      </nav>
+
+      <div class="header-actions">
+        <!-- Quick Ingest Button -->
+        <button id="openIngestModalBtn" class="btn btn-primary btn-sm">
+          ➕ Ingest Text / Comms
+        </button>
+
+        <!-- Theme Toggle -->
+        <button id="themeToggleBtn" class="btn btn-icon" title="Toggle Light/Dark Theme">
+          🌓
+        </button>
+
+        <!-- Settings Button -->
+        <button id="openSettingsBtn" class="btn btn-icon" title="Configure AI Engine & Gemini API">
+          ⚙️
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="main-content">
+
+      <!-- Forgotten-Work Radar Alert Banner -->
+      <div id="forgottenRadarBanner" class="forgotten-radar-banner" style="display: none;">
+        <!-- Injected via TaskManager -->
+      </div>
+
+      <!-- TAB 1: DASHBOARD -->
+      <section id="tab-dashboard" class="tab-pane active">
+        
+        <!-- KPI Stat Widgets Deck -->
+        <div class="stats-deck-grid">
+          <div class="stat-card">
+            <div class="stat-icon-wrap icon-detected">🔍</div>
+            <div>
+              <div class="stat-val" id="statDetectedCount">12</div>
+              <div class="stat-lbl">Detected Commitments</div>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon-wrap icon-pending">📥</div>
+            <div>
+              <div class="stat-val" id="statPendingCount">4</div>
+              <div class="stat-lbl">Pending Confirmation</div>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon-wrap icon-active">📋</div>
+            <div>
+              <div class="stat-val" id="statActiveCount">5</div>
+              <div class="stat-lbl">Confirmed Active Tasks</div>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon-wrap icon-risk">⚠️</div>
+            <div>
+              <div class="stat-val" id="statRisksCount">2</div>
+              <div class="stat-lbl">Forgotten-Work Risks</div>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon-wrap icon-score">🛡️</div>
+            <div>
+              <div class="stat-val" id="statReliabilityScore">94.2%</div>
+              <div class="stat-lbl">Team Reliability Index</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Ingest & Communication Simulator Deck -->
+        <div class="simulator-hero-card" style="margin-top: 1.5rem;">
+          <div class="simulator-header">
+            <div>
+              <h3 style="font-size: 1.2rem; font-weight: 800; color: var(--text-primary);">
+                🛰️ Everyday Communication Listener & Simulator
+              </h3>
+              <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 2px;">
+                Select a live corporate channel to simulate NLP extraction or paste your own message.
+              </p>
+            </div>
+
+            <div class="channels-preset-row">
+              <button class="channel-btn active" data-channel="slack">
+                💬 Slack (#product-launch)
+              </button>
+              <button class="channel-btn" data-channel="email">
+                ✉️ Gmail (Client Contract SLA)
+              </button>
+              <button class="channel-btn" data-channel="meeting">
+                🎙️ Zoom (Sprint Architecture)
+              </button>
+            </div>
+          </div>
+
+          <!-- Channel Preview Window -->
+          <div style="background: rgba(0, 0, 0, 0.35); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1.25rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+              <span id="activeChannelBadge" style="font-size: 0.85rem; font-weight: 700; color: var(--color-slack);">
+                💬 Channel: Slack #product-launch
+              </span>
+              <span id="activeChannelTimestamp" style="font-size: 0.75rem; color: var(--text-muted);">
+                Today, 10:42 AM
+              </span>
+            </div>
+
+            <pre id="activeChannelContent" style="font-family: var(--font-sans); font-size: 0.9rem; color: #e2e8f0; white-space: pre-wrap; line-height: 1.6; max-height: 160px; overflow-y: auto;">Loading communication feed...</pre>
+          </div>
+
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 1rem; flex-wrap: wrap; gap: 0.75rem;">
+            <div style="font-size: 0.85rem; color: var(--text-secondary);">
+              ⚡ CommitPulse AI automatically filters out small talk ("ordered pizza") and extracts only real work commitments.
+            </div>
+            <button id="runDetectionBtn" class="btn btn-primary">
+              ✨ Scan & Extract Commitments to AI Inbox
+            </button>
+          </div>
+        </div>
+
+        <!-- End-to-End Flow Infographic Card -->
+        <div style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 1.5rem; margin-top: 1.5rem;">
+          <h3 class="content-card-title">🔄 End-to-End Commitment Lifecycle</h3>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem;">
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1rem;">
+              <div style="font-size: 1.5rem; margin-bottom: 0.4rem;">💬</div>
+              <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary);">1. Daily Comms</div>
+              <div style="font-size: 0.775rem; color: var(--text-secondary); margin-top: 4px;">Emails, chats, and meetings where promises are casually made.</div>
+            </div>
+
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1rem;">
+              <div style="font-size: 1.5rem; margin-bottom: 0.4rem;">🧠</div>
+              <div style="font-weight: 700; font-size: 0.9rem; color: var(--color-accent);">2. AI NLP Extraction</div>
+              <div style="font-size: 0.775rem; color: var(--text-secondary); margin-top: 4px;">Identifies action, owner, deadline, and confidence score.</div>
+            </div>
+
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1rem;">
+              <div style="font-size: 1.5rem; margin-bottom: 0.4rem;">📥</div>
+              <div style="font-weight: 700; font-size: 0.9rem; color: var(--color-warning);">3. Human Confirmation</div>
+              <div style="font-size: 0.775rem; color: var(--text-secondary); margin-top: 4px;">Employee reviews in AI Inbox before it becomes a formal task.</div>
+            </div>
+
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1rem;">
+              <div style="font-size: 1.5rem; margin-bottom: 0.4rem;">📋</div>
+              <div style="font-weight: 700; font-size: 0.9rem; color: var(--color-primary);">4. Tracked Tasks</div>
+              <div style="font-size: 0.775rem; color: var(--text-secondary); margin-top: 4px;">Managed on Kanban board with deadline countdowns.</div>
+            </div>
+
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1rem;">
+              <div style="font-size: 1.5rem; margin-bottom: 0.4rem;">🚨</div>
+              <div style="font-weight: 700; font-size: 0.9rem; color: var(--color-danger);">5. Forgotten Radar</div>
+              <div style="font-size: 0.775rem; color: var(--text-secondary); margin-top: 4px;">Alerts employees before promises slip or get forgotten.</div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- TAB 2: AI INBOX (HUMAN CONFIRMATION QUEUE) -->
+      <section id="tab-inbox" class="tab-pane">
+        <div class="inbox-toolbar">
+          <div>
+            <h2 style="font-size: 1.35rem; font-weight: 800; color: var(--text-primary);">
+              📥 AI Inbox — Pending Confirmation
+            </h2>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 2px;">
+              Review detected commitments. Only confirmed commitments enter the official task tracking system.
+            </p>
+          </div>
+
+          <div class="inbox-filters-row">
+            <select id="inboxSourceFilter" class="form-select">
+              <option value="all">🌐 All Channels</option>
+              <option value="slack">💬 Slack</option>
+              <option value="email">✉️ Email</option>
+              <option value="meeting">🎙️ Meeting</option>
+            </select>
+
+            <select id="inboxConfidenceFilter" class="form-select">
+              <option value="all">🎯 All Confidence</option>
+              <option value="high">High Confidence (≥90%)</option>
+              <option value="medium">Medium (≥80%)</option>
+            </select>
+
+            <button id="inboxConfirmAllBtn" class="btn btn-primary btn-sm">
+              ✅ Confirm All
+            </button>
+          </div>
+        </div>
+
+        <!-- AI Inbox Cards Target -->
+        <div id="inboxContainer">
+          <!-- Rendered by InboxManager -->
+        </div>
+      </section>
+
+      <!-- TAB 3: MY TASKS & KANBAN TRACKING -->
+      <section id="tab-tasks" class="tab-pane">
+        <div class="inbox-toolbar">
+          <div class="inbox-filters-row">
+            <select id="taskOwnerFilter" class="form-select">
+              <option value="all">👥 All Team Owners</option>
+            </select>
+
+            <select id="taskPriorityFilter" class="form-select">
+              <option value="all">⚡ All Priorities</option>
+              <option value="urgent">Urgent</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+
+            <select id="taskSourceFilter" class="form-select">
+              <option value="all">🌐 All Sources</option>
+              <option value="slack">Slack</option>
+              <option value="email">Email</option>
+              <option value="meeting">Meeting</option>
+            </select>
+
+            <input type="text" id="taskSearchInput" class="form-input" placeholder="🔍 Search tasks or original quotes..." style="width: 240px;">
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <!-- View Mode Switcher -->
+            <button id="viewKanbanBtn" class="btn btn-secondary btn-sm" style="background: rgba(16,185,129,0.15); color: var(--color-primary);">
+              📋 Kanban View
+            </button>
+            <button id="viewListBtn" class="btn btn-secondary btn-sm">
+              📑 List View
+            </button>
+            <button id="addNewTaskManualBtn" class="btn btn-primary btn-sm">
+              ➕ New Task
+            </button>
+          </div>
+        </div>
+
+        <!-- Kanban Board View -->
+        <div id="kanbanBoardContainer" class="kanban-grid">
+          <!-- Rendered by TaskManager -->
+        </div>
+
+        <!-- List Table View (Hidden by default) -->
+        <div id="tasksListContainer" style="display: none;">
+          <!-- Rendered by TaskManager -->
+        </div>
+      </section>
+
+      <!-- TAB 4: COMMITMENT HISTORY & AUDIT TRAIL -->
+      <section id="tab-history" class="tab-pane">
+        <div class="content-card">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div>
+              <h3 class="content-card-title" style="margin-bottom: 0;">📜 Commitment Audit Trail & Source History</h3>
+              <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 2px;">
+                Complete traceability linking every confirmed task directly to the original email thread, chat message, or meeting transcript.
+              </p>
+            </div>
+            <button id="exportAuditCsvBtn" class="btn btn-secondary btn-sm">
+              ⬇️ Export Audit Log (CSV)
+            </button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="tasks-table">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Task ID & Summary</th>
+                  <th>Responsible Owner</th>
+                  <th>Source Channel</th>
+                  <th>Audit Action</th>
+                </tr>
+              </thead>
+              <tbody id="auditHistoryTableBody">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: TEAM ANALYTICS & RELIABILITY SCORE -->
+      <section id="tab-analytics" class="tab-pane">
+        <div class="analytics-grid">
+          
+          <div class="chart-card">
+            <h3 class="content-card-title">📈 Commitment-to-Task Conversion Rate</h3>
+            <div style="height: 280px; display: flex; align-items: center; justify-content: center;">
+              <canvas id="conversionDoughnutChart"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <h3 class="content-card-title">🛡️ Team Member Execution & Reliability Index</h3>
+            <div style="height: 280px; display: flex; align-items: center; justify-content: center;">
+              <canvas id="reliabilityBarChart"></canvas>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="content-card" style="margin-top: 1.5rem;">
+          <h3 class="content-card-title">👥 Team Member Reliability Roster</h3>
+          <div class="team-members-grid" id="teamMembersGrid">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 6: SAAS PRICING & BUSINESS MODEL -->
+      <section id="tab-pricing" class="tab-pane">
+        <div class="pricing-header">
+          <h2 class="pricing-title">Simple, Transparent SaaS Pricing</h2>
+          <p style="color: var(--text-secondary); font-size: 0.95rem;">
+            Turn forgotten informal promises into tracked execution. Choose the plan that fits your organization.
+          </p>
+
+          <div style="display: inline-flex; align-items: center; gap: 0.75rem; background: var(--bg-card); padding: 6px 14px; border-radius: var(--radius-full); border: 1px solid var(--border-subtle); margin-top: 1.25rem;">
+            <span style="font-size: 0.85rem; font-weight: 600;">Monthly Billing</span>
+            <input type="checkbox" id="pricingBillingToggle" style="cursor: pointer;">
+            <span style="font-size: 0.85rem; font-weight: 600; color: var(--color-primary);">Annual Billing (Save 20%)</span>
+          </div>
+        </div>
+
+        <!-- 4 Pricing Tiers -->
+        <div class="pricing-plans-grid">
+          
+          <!-- Free Plan -->
+          <div class="plan-card">
+            <div class="plan-name">Free</div>
+            <div class="plan-price">₹0</div>
+            <div class="plan-price-period">forever free for individuals</div>
+            <p class="plan-desc">For individual freelancers testing commitment detection on personal workflows.</p>
+            <ul class="plan-features-list">
+              <li class="plan-feature-item">✓ Up to 30 detected commitments / mo</li>
+              <li class="plan-feature-item">✓ Manual text & transcript paste</li>
+              <li class="plan-feature-item">✓ Personal Kanban board</li>
+              <li class="plan-feature-item">✓ Standard deadline alerts</li>
+            </ul>
+            <button class="btn btn-secondary" style="width: 100%;">Get Started Free</button>
+          </div>
+
+          <!-- Pro Plan -->
+          <div class="plan-card">
+            <div class="plan-name">Pro</div>
+            <div class="plan-price" id="proPriceDisplay">₹299</div>
+            <div class="plan-price-period">/ user / month</div>
+            <p class="plan-desc">For professionals and consultants who juggle dozens of client promises every week.</p>
+            <ul class="plan-features-list">
+              <li class="plan-feature-item">✓ Unlimited commitment detection</li>
+              <li class="plan-feature-item">✓ Gmail & Outlook sync integration</li>
+              <li class="plan-feature-item">✓ Forgotten-Work Risk Radar</li>
+              <li class="plan-feature-item">✓ High-confidence NLP parsing (98%)</li>
+              <li class="plan-feature-item">✓ Export to CSV & Markdown</li>
+            </ul>
+            <button class="btn btn-primary" style="width: 100%;">Start 14-Day Free Trial</button>
+          </div>
+
+          <!-- Team Plan (Featured) -->
+          <div class="plan-card featured">
+            <div class="plan-badge-top">MOST POPULAR</div>
+            <div class="plan-name">Team</div>
+            <div class="plan-price" id="teamPriceDisplay" style="color: var(--color-primary);">₹599</div>
+            <div class="plan-price-period">/ user / month</div>
+            <p class="plan-desc">For fast-growing startups, agencies, and IT companies to eliminate dropped balls.</p>
+            <ul class="plan-features-list">
+              <li class="plan-feature-item">✓ <strong>Everything in Pro</strong></li>
+              <li class="plan-feature-item">✓ Slack & MS Teams channel listeners</li>
+              <li class="plan-feature-item">✓ Cross-team task delegation</li>
+              <li class="plan-feature-item">✓ Team Reliability Analytics & Index</li>
+              <li class="plan-feature-item">✓ 2-Way Sync with Jira & Linear</li>
+              <li class="plan-feature-item">✓ Automated Slack Reminder Nudges</li>
+            </ul>
+            <button class="btn btn-primary" style="width: 100%;">Upgrade Team</button>
+          </div>
+
+          <!-- Enterprise Plan -->
+          <div class="plan-card">
+            <div class="plan-name">Enterprise</div>
+            <div class="plan-price">Custom</div>
+            <div class="plan-price-period">volume licensing & custom SLAs</div>
+            <p class="plan-desc">For large organizations requiring strict compliance, private cloud, and custom SSO.</p>
+            <ul class="plan-features-list">
+              <li class="plan-feature-item">✓ <strong>Everything in Team</strong></li>
+              <li class="plan-feature-item">✓ Dedicated private LLM instance</li>
+              <li class="plan-feature-item">✓ SOC 2 & HIPAA zero-retention guarantee</li>
+              <li class="plan-feature-item">✓ SAML 2.0 / Okta SSO & SCIM</li>
+              <li class="plan-feature-item">✓ Dedicated Customer Success Manager</li>
+            </ul>
+            <button class="btn btn-secondary" style="width: 100%;">Contact Sales</button>
+          </div>
+
+        </div>
+
+        <!-- Interactive ROI Calculator Card -->
+        <div style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 1.75rem; margin-top: 2rem;">
+          <h3 class="content-card-title">💡 CommitPulse ROI & Productivity Savings Calculator</h3>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 1rem;">
+            <div>
+              <div class="form-group">
+                <label class="form-label">Number of Employees / Team Members: <strong id="roiEmployeesCount">25</strong></label>
+                <input type="range" id="roiEmployeesSlider" min="5" max="200" value="25" style="accent-color: var(--color-primary); cursor: pointer;">
+              </div>
+              <div class="form-group" style="margin-top: 1rem;">
+                <label class="form-label">Estimated Forgotten Promises Prevented per Person/Month: <strong id="roiForgottenCount">6</strong></label>
+                <input type="range" id="roiForgottenSlider" min="1" max="20" value="6" style="accent-color: var(--color-primary); cursor: pointer;">
+              </div>
+            </div>
+
+            <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: var(--radius-md); padding: 1.25rem; display: flex; flex-direction: column; justify-content: center;">
+              <div style="font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Estimated Monthly Value Saved</div>
+              <div style="font-size: 2.2rem; font-weight: 800; color: var(--color-primary); font-family: var(--font-sans);" id="roiSavedAmount">₹1,12,500</div>
+              <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Based on ~150 dropped balls prevented and 75 executive follow-up hours recovered per month.</div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Custom Ingest / Message Paste Modal -->
+  <div id="ingestModal" class="modal-overlay">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title">➕ Ingest Communication for AI Detection</h3>
+        <button class="modal-close-btn" onclick="window.commitPulseApp.closeIngestModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Source Type</label>
+          <select id="customIngestSource" class="form-select">
+            <option value="Slack">💬 Slack Message / Thread</option>
+            <option value="Email">✉️ Gmail / Outlook Email</option>
+            <option value="Meeting">🎙️ Meeting Transcript</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Channel / Context Name</label>
+          <input type="text" id="customIngestChannel" class="form-input" placeholder="e.g. #marketing-sprint, Client Email, Zoom Call">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Paste Communication Text</label>
+          <textarea id="customIngestText" class="form-textarea" rows="6" placeholder="Rahul, please send the sales report by Friday 5 PM.&#10;I will complete the Figma tokens tomorrow before noon.&#10;Can you check with the supplier by Wednesday?"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="window.commitPulseApp.closeIngestModal()">Cancel</button>
+        <button class="btn btn-primary" id="runCustomIngestBtn">✨ Scan for Commitments</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Commitment Modal -->
+  <div id="editCommitmentModal" class="modal-overlay">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title">✏️ Edit Detected Commitment</h3>
+        <button class="modal-close-btn" onclick="window.commitPulseApp.closeEditCommitmentModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editCommitmentId">
+        <div class="form-group">
+          <label class="form-label">Action / Task Title</label>
+          <input type="text" id="editCommitmentTitle" class="form-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Responsible Owner</label>
+          <input type="text" id="editCommitmentOwner" class="form-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Target Deadline</label>
+          <input type="text" id="editCommitmentDeadline" class="form-input" placeholder="e.g. Friday, 5:00 PM">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Priority</label>
+          <select id="editCommitmentPriority" class="form-select">
+            <option value="Urgent">Urgent</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="window.commitPulseApp.closeEditCommitmentModal()">Cancel</button>
+        <button class="btn btn-primary" id="saveEditCommitmentBtn">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delegate Commitment Modal -->
+  <div id="delegateModal" class="modal-overlay">
+    <div class="modal-dialog" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 class="modal-title">🔄 Delegate Commitment</h3>
+        <button class="modal-close-btn" onclick="window.commitPulseApp.closeDelegateModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="delegateCommitmentId">
+        <p style="font-size: 0.875rem; color: var(--text-secondary);">
+          Reassign this detected work commitment to a teammate:
+        </p>
+        <div class="form-group">
+          <label class="form-label">Select Team Member</label>
+          <select id="delegateMemberSelect" class="form-select">
+            <!-- Injected via JS -->
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="window.commitPulseApp.closeDelegateModal()">Cancel</button>
+        <button class="btn btn-primary" id="saveDelegateBtn">Reassign & Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Task Detail Modal -->
+  <div id="taskDetailModal" class="modal-overlay">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title" id="taskDetailModalTitle">Task Details</h3>
+        <button class="modal-close-btn" onclick="window.commitPulseApp.closeTaskModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="modalTaskId">
+        <div class="form-group">
+          <label class="form-label">Task Title</label>
+          <input type="text" id="modalTaskTitle" class="form-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Owner</label>
+          <input type="text" id="modalTaskOwner" class="form-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select id="modalTaskStatus" class="form-select">
+            <option value="todo">To Do</option>
+            <option value="in-progress">In Progress</option>
+            <option value="waiting">Waiting / Blocked</option>
+            <option value="done">Completed</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Deadline</label>
+          <input type="text" id="modalTaskDeadline" class="form-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Original Conversation Snippet</label>
+          <div id="modalTaskOriginalSnippet" style="background: rgba(0,0,0,0.3); padding: 0.85rem; border-radius: var(--radius-sm); font-size: 0.85rem; color: #cbd5e1; font-style: italic;"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger" id="modalDeleteTaskBtn" style="margin-right: auto;">Delete</button>
+        <button class="btn btn-secondary" onclick="window.commitPulseApp.closeTaskModal()">Cancel</button>
+        <button class="btn btn-primary" id="modalSaveTaskBtn">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Settings Modal -->
+  <div id="settingsModal" class="modal-overlay">
+    <div class="modal-dialog" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3 class="modal-title">⚙️ AI Engine Settings</h3>
+        <button class="modal-close-btn" onclick="window.commitPulseApp.closeSettingsModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Google Gemini API Key (Optional)</label>
+          <input type="password" id="geminiApiKeyInput" class="form-input" placeholder="AIzaSy...">
+          <small style="color: var(--text-muted); font-size: 0.775rem; margin-top: 4px;">
+            Optional. When omitted, CommitPulse uses its high-speed built-in NLP heuristics engine for real-time offline commitment extraction.
+          </small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="window.commitPulseApp.closeSettingsModal()">Cancel</button>
+        <button class="btn btn-primary" id="saveSettingsBtn">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notifications Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Master Application Script -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
