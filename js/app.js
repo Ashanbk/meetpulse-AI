@@ -33,7 +33,6 @@ class CommitPulseApp {
   }
 
   initInbox() {
-    // Initial commitments from preloaded comms
     const initialCommitments = [];
     PRELOADED_COMMS.forEach(c => {
       if (c.detectedCommitments) {
@@ -88,7 +87,7 @@ class CommitPulseApp {
         if (pane) pane.classList.add('active');
 
         if (tabId === 'tab-analytics') {
-          setTimeout(() => this.renderAnalytics(), 60);
+          setTimeout(() => this.renderAnalytics(), 80);
         }
         if (tabId === 'tab-history') {
           this.renderAuditHistory();
@@ -128,7 +127,7 @@ class CommitPulseApp {
         
         const extracted = await this.commitmentEngine.analyzeCommunication({
           text: activeComm.rawContent,
-          sourceType: activeComm.sourceType || (this.activeChannelIndex === 0 ? "Slack" : this.activeChannelIndex === 1 ? "Email" : "Meeting"),
+          sourceType: activeComm.channelType === "slack" ? "Slack" : activeComm.channelType === "email" ? "Email" : "Meeting",
           sourceChannel: activeComm.channelName,
           sender: activeComm.sender
         });
@@ -136,7 +135,6 @@ class CommitPulseApp {
         this.inboxManager.addCommitments(extracted);
         this.showToast(`🎉 Detected ${extracted.length} commitments added to AI Inbox!`);
         
-        // Auto-switch to AI Inbox tab to delight the user
         setTimeout(() => {
           document.querySelector('[data-tab="tab-inbox"]')?.click();
         }, 400);
@@ -176,15 +174,19 @@ class CommitPulseApp {
       kanbanBtn.addEventListener('click', () => {
         kanbanBtn.style.background = 'rgba(16,185,129,0.15)';
         kanbanBtn.style.color = 'var(--color-primary)';
+        kanbanBtn.style.borderColor = 'rgba(16,185,129,0.3)';
         listBtn.style.background = 'var(--bg-card)';
         listBtn.style.color = 'var(--text-primary)';
+        listBtn.style.borderColor = 'var(--border-subtle)';
         this.taskManager.setViewMode('kanban');
       });
       listBtn.addEventListener('click', () => {
         listBtn.style.background = 'rgba(16,185,129,0.15)';
         listBtn.style.color = 'var(--color-primary)';
+        listBtn.style.borderColor = 'rgba(16,185,129,0.3)';
         kanbanBtn.style.background = 'var(--bg-card)';
         kanbanBtn.style.color = 'var(--text-primary)';
+        kanbanBtn.style.borderColor = 'var(--border-subtle)';
         this.taskManager.setViewMode('list');
       });
     }
@@ -225,11 +227,91 @@ class CommitPulseApp {
   loadChannelPreview(comm) {
     const badge = document.getElementById('activeChannelBadge');
     const timestamp = document.getElementById('activeChannelTimestamp');
-    const content = document.getElementById('activeChannelContent');
+    const feedContainer = document.getElementById('richChannelFeed');
 
-    if (badge) badge.textContent = `${comm.channelIcon} Channel: ${comm.channelName}`;
+    if (badge) {
+      badge.textContent = `${comm.channelIcon} Channel: ${comm.channelName}`;
+      badge.style.color = comm.channelType === 'slack' ? 'var(--color-slack)' : comm.channelType === 'email' ? 'var(--color-email)' : 'var(--color-zoom)';
+    }
     if (timestamp) timestamp.textContent = comm.timestamp;
-    if (content) content.textContent = comm.rawContent;
+
+    if (feedContainer) {
+      feedContainer.innerHTML = this.formatRichFeed(comm);
+    }
+  }
+
+  formatRichFeed(comm) {
+    if (comm.channelType === "slack") {
+      const lines = comm.rawContent.split('\n');
+      const avatarMap = {
+        'Aarav': '👨‍💼',
+        'Rahul': '👨‍💻',
+        'Priya': '👩‍🎨',
+        'Vikram': '👨‍🔧',
+        'Neha': '👩‍💼'
+      };
+
+      return lines.map(line => {
+        const colonIdx = line.indexOf(':');
+        if (colonIdx === -1) return `<div class="chat-text">${line}</div>`;
+        const sender = line.substring(0, colonIdx).trim();
+        const text = line.substring(colonIdx + 1).trim();
+        const avatar = avatarMap[sender] || '👤';
+        const isCommitment = text.includes('please send') || text.includes('will complete') || text.includes('check with') || text.includes('review the');
+
+        return `
+          <div class="chat-bubble-row">
+            <div class="chat-avatar">${avatar}</div>
+            <div class="chat-msg-body">
+              <div class="chat-msg-meta">
+                <span class="chat-sender-name">${sender}</span>
+                <span class="chat-timestamp">10:42 AM</span>
+                ${isCommitment ? '<span style="font-size: 0.7rem; background: rgba(16,185,129,0.15); color: var(--color-primary); padding: 1px 6px; border-radius: 4px; font-weight: 700;">⚡ Commitment Detected</span>' : ''}
+              </div>
+              <div class="chat-text ${isCommitment ? 'chat-commitment-highlight' : ''}">${text}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } else if (comm.channelType === "email") {
+      return `
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1.15rem; font-size: 0.875rem;">
+          <div style="display: grid; grid-template-columns: 80px 1fr; gap: 0.4rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-subtle); margin-bottom: 0.85rem; font-size: 0.825rem;">
+            <strong style="color: var(--text-muted);">From:</strong> <span>Sarah Jenkins &lt;sjenkins@apexfin.com&gt;</span>
+            <strong style="color: var(--text-muted);">To:</strong> <span>dev-leads@company.com</span>
+            <strong style="color: var(--text-muted);">Subject:</strong> <span style="font-weight: 700; color: var(--text-primary);">Re: Production Database Migration Timeline & SLA</span>
+          </div>
+          <div style="line-height: 1.6; color: #e2e8f0; white-space: pre-wrap;">Hi Team,
+
+We need confirmation on the database failover SLA before signing the master service agreement.
+<span class="chat-commitment-highlight">Could someone from backend please provide the updated RPO/RTO benchmark document by tomorrow EOD?</span>
+<span class="chat-commitment-highlight">Also, please update the staging environment with sanitized data by Thursday.</span>
+
+Best regards,
+Sarah Jenkins (VP Tech, Apex Financial)</div>
+        </div>
+      `;
+    } else {
+      // Zoom Meeting Transcript
+      return `
+        <div>
+          <div class="audio-waveform-deck" title="Live Zoom Audio Stream Transcribed">
+            <span style="font-size: 0.75rem; font-weight: 700; color: var(--color-zoom); margin-right: 6px;">🎙️ Audio Transcript:</span>
+            <div class="waveform-bar" style="animation-delay: 0.1s;"></div>
+            <div class="waveform-bar" style="animation-delay: 0.3s;"></div>
+            <div class="waveform-bar" style="animation-delay: 0.15s;"></div>
+            <div class="waveform-bar" style="animation-delay: 0.45s;"></div>
+            <div class="waveform-bar" style="animation-delay: 0.25s;"></div>
+            <div class="waveform-bar" style="animation-delay: 0.5s;"></div>
+            <div class="waveform-bar" style="animation-delay: 0.2s;"></div>
+          </div>
+          <div style="font-size: 0.875rem; line-height: 1.7; color: #cbd5e1; white-space: pre-wrap; margin-top: 0.5rem;">[00:14:10] <strong>David Chen (VP Eng):</strong> "We need the API rate limiter merged before the mobile release on Monday."
+[00:14:32] <strong>Kavita Rao (Lead Dev):</strong> "<span class="chat-commitment-highlight">I will optimize the Redis cache layer and push the pull request by Friday 3 PM.</span>"
+[00:15:05] <strong>David Chen:</strong> "<span class="chat-commitment-highlight">Great. Rohan, can you verify the load testing benchmarks by Friday evening?</span>"
+[00:15:20] <strong>Rohan Mehta (QA):</strong> "Understood, will complete the load tests on staging."</div>
+        </div>
+      `;
+    }
   }
 
   updateDashboardKPIs() {
@@ -271,18 +353,18 @@ class CommitPulseApp {
 
     container.innerHTML = this.teamMembers.map(m => `
       <div class="member-card">
-        <div style="display: flex; align-items: center; gap: 0.75rem;">
-          <span style="font-size: 1.75rem; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;">
+        <div style="display: flex; align-items: center; gap: 0.85rem; flex: 1;">
+          <div class="member-avatar">
             ${m.avatar}
-          </span>
+          </div>
           <div>
-            <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary);">${m.name}</div>
+            <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary); font-family: var(--font-heading);">${m.name}</div>
             <div style="font-size: 0.775rem; color: var(--text-secondary);">${m.role} • ${m.department}</div>
           </div>
         </div>
         <div style="text-align: right;">
-          <div style="font-weight: 800; font-size: 1.1rem; color: var(--color-primary);">${m.reliabilityScore}%</div>
-          <div style="font-size: 0.75rem; color: var(--text-muted);">Reliability</div>
+          <div style="font-weight: 800; font-size: 1.15rem; color: var(--color-primary); font-family: var(--font-heading);">${m.reliabilityScore}%</div>
+          <div style="font-size: 0.725rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Reliability</div>
         </div>
       </div>
     `).join('');
@@ -306,8 +388,8 @@ class CommitPulseApp {
           <div style="font-weight: 600; font-size: 0.875rem;">${h.title}</div>
         </td>
         <td><strong>${h.owner}</strong></td>
-        <td><span class="source-tag-sm">${h.sourceType || 'Direct'} (${h.sourceChannel || 'General'})</span></td>
-        <td><span class="badge" style="background: rgba(16,185,129,0.15); color: var(--color-primary); padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 0.75rem;">${h.action}</span></td>
+        <td><span style="font-size: 0.8rem; color: var(--text-secondary);">${h.sourceType || 'Direct'} (${h.sourceChannel || 'General'})</span></td>
+        <td><span style="background: rgba(16,185,129,0.15); color: var(--color-primary); padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 0.75rem;">${h.action}</span></td>
       </tr>
     `).join('');
   }
@@ -328,8 +410,9 @@ class CommitPulseApp {
           datasets: [{
             data: [confirmedCount, pendingCount, Math.max(1, dismissedCount)],
             backgroundColor: ['#10b981', '#f59e0b', '#64748b'],
-            borderColor: '#0d1322',
-            borderWidth: 2
+            borderColor: '#070a13',
+            borderWidth: 3,
+            hoverOffset: 6
           }]
         },
         options: {
@@ -338,9 +421,10 @@ class CommitPulseApp {
           plugins: {
             legend: {
               position: 'right',
-              labels: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans', size: 12 } }
+              labels: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans', size: 12, weight: 600 } }
             }
-          }
+          },
+          cutout: '68%'
         }
       });
     }
@@ -357,7 +441,8 @@ class CommitPulseApp {
             label: 'Reliability Index %',
             data: this.teamMembers.map(m => m.reliabilityScore),
             backgroundColor: '#06b6d4',
-            borderRadius: 6
+            borderRadius: 8,
+            borderSkipped: false
           }]
         },
         options: {
@@ -367,11 +452,11 @@ class CommitPulseApp {
             y: {
               min: 70,
               max: 100,
-              ticks: { color: '#94a3b8' },
-              grid: { color: 'rgba(255,255,255,0.05)' }
+              ticks: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans' } },
+              grid: { color: 'rgba(255,255,255,0.06)' }
             },
             x: {
-              ticks: { color: '#94a3b8' },
+              ticks: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans', weight: 600 } },
               grid: { display: false }
             }
           },
@@ -668,15 +753,17 @@ class CommitPulseApp {
     if (!container) return;
 
     const toast = document.createElement('div');
-    toast.className = 'toast';
+    toast.className = 'toast-item';
     toast.textContent = message;
     container.appendChild(toast);
 
     setTimeout(() => {
       toast.style.opacity = '0';
-      toast.style.transform = 'translateX(100%)';
+      toast.style.transform = 'translateY(16px) scale(0.95)';
       toast.style.transition = 'all 0.3s ease-out';
-      setTimeout(() => container.removeChild(toast), 300);
+      setTimeout(() => {
+        if (toast.parentNode) container.removeChild(toast);
+      }, 300);
     }, 3200);
   }
 }

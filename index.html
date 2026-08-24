@@ -15,39 +15,49 @@
     <!-- Master Header -->
     <header class="app-header">
       <div class="brand-section">
-        <div class="brand-logo">⚡</div>
-        <div>
-          <div class="brand-name">CommitPulse AI</div>
+        <div class="brand-logo-wrap">
+          <div class="brand-logo">⚡</div>
+        </div>
+        <div class="brand-name-group">
+          <div class="brand-name">
+            CommitPulse <span style="font-size: 0.75rem; padding: 2px 7px; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); border-radius: var(--radius-full); color: var(--color-primary); font-family: var(--font-mono); font-weight: 700;">AI 2.0</span>
+          </div>
           <div class="brand-tagline">AI that finds the work hiding inside your conversations</div>
         </div>
       </div>
 
       <!-- Main Navigation Tabs -->
       <nav class="main-nav-tabs">
-        <button class="nav-tab-btn active" data-tab="tab-dashboard">
+        <button class="nav-tab-btn active" data-tab="tab-dashboard" id="navTabDashboard">
           📊 Dashboard
         </button>
-        <button class="nav-tab-btn" data-tab="tab-inbox">
+        <button class="nav-tab-btn" data-tab="tab-inbox" id="navTabInbox">
           📥 AI Inbox <span class="nav-badge" id="navInboxBadge">4</span>
         </button>
-        <button class="nav-tab-btn" data-tab="tab-tasks">
-          📋 My Tasks <span class="nav-badge" id="navTasksBadge" style="background: var(--color-accent);">5</span>
+        <button class="nav-tab-btn" data-tab="tab-tasks" id="navTabTasks">
+          📋 My Tasks <span class="nav-badge" id="navTasksBadge" style="background: var(--color-accent); color: #070a13;">5</span>
         </button>
-        <button class="nav-tab-btn" data-tab="tab-history">
+        <button class="nav-tab-btn" data-tab="tab-history" id="navTabHistory">
           📜 History & Audit
         </button>
-        <button class="nav-tab-btn" data-tab="tab-analytics">
+        <button class="nav-tab-btn" data-tab="tab-analytics" id="navTabAnalytics">
           📈 Team Analytics
         </button>
-        <button class="nav-tab-btn" data-tab="tab-pricing">
-          💎 Pricing Plans
+        <button class="nav-tab-btn" data-tab="tab-pricing" id="navTabPricing">
+          💎 SaaS Pricing
         </button>
       </nav>
 
       <div class="header-actions">
+        <!-- Live Status Pill -->
+        <div class="system-status-pill">
+          <span class="status-dot-pulse"></span>
+          <span>NLP Engine Active</span>
+        </div>
+
         <!-- Quick Ingest Button -->
         <button id="openIngestModalBtn" class="btn btn-primary btn-sm">
-          ➕ Ingest Text / Comms
+          ➕ Ingest Comms
         </button>
 
         <!-- Theme Toggle -->
@@ -79,7 +89,7 @@
             <div class="stat-icon-wrap icon-detected">🔍</div>
             <div>
               <div class="stat-val" id="statDetectedCount">12</div>
-              <div class="stat-lbl">Detected Commitments</div>
+              <div class="stat-lbl">Detected Promises</div>
             </div>
           </div>
 
@@ -95,7 +105,7 @@
             <div class="stat-icon-wrap icon-active">📋</div>
             <div>
               <div class="stat-val" id="statActiveCount">5</div>
-              <div class="stat-lbl">Confirmed Active Tasks</div>
+              <div class="stat-lbl">Active Tracked Tasks</div>
             </div>
           </div>
 
@@ -120,11 +130,11 @@
         <div class="simulator-hero-card" style="margin-top: 1.5rem;">
           <div class="simulator-header">
             <div>
-              <h3 style="font-size: 1.2rem; font-weight: 800; color: var(--text-primary);">
+              <h3 style="font-family: var(--font-heading); font-size: 1.3rem; font-weight: 800; color: var(--text-primary);">
                 🛰️ Everyday Communication Listener & Simulator
               </h3>
-              <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 2px;">
-                Select a live corporate channel to simulate NLP extraction or paste your own message.
+              <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 3px;">
+                Select a connected corporate channel to simulate NLP commitment extraction or paste custom text.
               </p>
             </div>
 
@@ -133,7 +143,7 @@
                 💬 Slack (#product-launch)
               </button>
               <button class="channel-btn" data-channel="email">
-                ✉️ Gmail (Client Contract SLA)
+                ✉️ Gmail (Apex SLA Contract)
               </button>
               <button class="channel-btn" data-channel="meeting">
                 🎙️ Zoom (Sprint Architecture)
@@ -142,22 +152,30 @@
           </div>
 
           <!-- Channel Preview Window -->
-          <div style="background: rgba(0, 0, 0, 0.35); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1.25rem;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
-              <span id="activeChannelBadge" style="font-size: 0.85rem; font-weight: 700; color: var(--color-slack);">
-                💬 Channel: Slack #product-launch
-              </span>
-              <span id="activeChannelTimestamp" style="font-size: 0.75rem; color: var(--text-muted);">
+          <div class="channel-feed-container">
+            <div class="feed-header-bar">
+              <div style="display: flex; align-items: center; gap: 0.6rem;">
+                <span id="activeChannelBadge" style="font-size: 0.85rem; font-weight: 700; color: var(--color-slack);">
+                  💬 Channel: Slack #product-launch
+                </span>
+                <span style="font-size: 0.75rem; background: rgba(16,185,129,0.15); color: var(--color-primary); padding: 2px 8px; border-radius: var(--radius-full); font-weight: 700;">
+                  Live Stream Connected
+                </span>
+              </div>
+              <span id="activeChannelTimestamp" style="font-size: 0.775rem; color: var(--text-muted); font-family: var(--font-mono);">
                 Today, 10:42 AM
               </span>
             </div>
 
-            <pre id="activeChannelContent" style="font-family: var(--font-sans); font-size: 0.9rem; color: #e2e8f0; white-space: pre-wrap; line-height: 1.6; max-height: 160px; overflow-y: auto;">Loading communication feed...</pre>
+            <!-- Styled Rich Content Feed -->
+            <div id="richChannelFeed" class="chat-thread-view">
+              <!-- Rendered dynamically by app.js -->
+            </div>
           </div>
 
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 1rem; flex-wrap: wrap; gap: 0.75rem;">
-            <div style="font-size: 0.85rem; color: var(--text-secondary);">
-              ⚡ CommitPulse AI automatically filters out small talk ("ordered pizza") and extracts only real work commitments.
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
+            <div style="font-size: 0.85rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.4rem;">
+              <span>⚡ CommitPulse NLP engine extracts only verified work promises and filters out conversational noise.</span>
             </div>
             <button id="runDetectionBtn" class="btn btn-primary">
               ✨ Scan & Extract Commitments to AI Inbox
@@ -166,37 +184,39 @@
         </div>
 
         <!-- End-to-End Flow Infographic Card -->
-        <div style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 1.5rem; margin-top: 1.5rem;">
+        <div class="lifecycle-flow-card">
           <h3 class="content-card-title">🔄 End-to-End Commitment Lifecycle</h3>
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem;">
-            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1rem;">
-              <div style="font-size: 1.5rem; margin-bottom: 0.4rem;">💬</div>
-              <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary);">1. Daily Comms</div>
-              <div style="font-size: 0.775rem; color: var(--text-secondary); margin-top: 4px;">Emails, chats, and meetings where promises are casually made.</div>
+          <p style="font-size: 0.85rem; color: var(--text-secondary);">How CommitPulse AI transforms casual conversations into zero-loss execution:</p>
+          
+          <div class="lifecycle-flow-grid">
+            <div class="lifecycle-step-card">
+              <div class="lifecycle-step-icon">💬</div>
+              <div class="lifecycle-step-title">1. Daily Comms</div>
+              <div class="lifecycle-step-desc">Emails, chats, and meetings where promises are casually spoken.</div>
             </div>
 
-            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1rem;">
-              <div style="font-size: 1.5rem; margin-bottom: 0.4rem;">🧠</div>
-              <div style="font-weight: 700; font-size: 0.9rem; color: var(--color-accent);">2. AI NLP Extraction</div>
-              <div style="font-size: 0.775rem; color: var(--text-secondary); margin-top: 4px;">Identifies action, owner, deadline, and confidence score.</div>
+            <div class="lifecycle-step-card">
+              <div class="lifecycle-step-icon">🧠</div>
+              <div class="lifecycle-step-title" style="color: var(--color-accent);">2. AI NLP Extraction</div>
+              <div class="lifecycle-step-desc">Extracts action title, owner, deadline, and confidence score.</div>
             </div>
 
-            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1rem;">
-              <div style="font-size: 1.5rem; margin-bottom: 0.4rem;">📥</div>
-              <div style="font-weight: 700; font-size: 0.9rem; color: var(--color-warning);">3. Human Confirmation</div>
-              <div style="font-size: 0.775rem; color: var(--text-secondary); margin-top: 4px;">Employee reviews in AI Inbox before it becomes a formal task.</div>
+            <div class="lifecycle-step-card">
+              <div class="lifecycle-step-icon">📥</div>
+              <div class="lifecycle-step-title" style="color: var(--color-warning);">3. Human Confirmation</div>
+              <div class="lifecycle-step-desc">Employee reviews in AI Inbox before it becomes a formal task.</div>
             </div>
 
-            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1rem;">
-              <div style="font-size: 1.5rem; margin-bottom: 0.4rem;">📋</div>
-              <div style="font-weight: 700; font-size: 0.9rem; color: var(--color-primary);">4. Tracked Tasks</div>
-              <div style="font-size: 0.775rem; color: var(--text-secondary); margin-top: 4px;">Managed on Kanban board with deadline countdowns.</div>
+            <div class="lifecycle-step-card">
+              <div class="lifecycle-step-icon">📋</div>
+              <div class="lifecycle-step-title" style="color: var(--color-primary);">4. Tracked Tasks</div>
+              <div class="lifecycle-step-desc">Managed on Kanban board with automated deadline countdowns.</div>
             </div>
 
-            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1rem;">
-              <div style="font-size: 1.5rem; margin-bottom: 0.4rem;">🚨</div>
-              <div style="font-weight: 700; font-size: 0.9rem; color: var(--color-danger);">5. Forgotten Radar</div>
-              <div style="font-size: 0.775rem; color: var(--text-secondary); margin-top: 4px;">Alerts employees before promises slip or get forgotten.</div>
+            <div class="lifecycle-step-card">
+              <div class="lifecycle-step-icon">🚨</div>
+              <div class="lifecycle-step-title" style="color: var(--color-danger);">5. Forgotten Radar</div>
+              <div class="lifecycle-step-desc">Proactive alerts before promises slip or get forgotten.</div>
             </div>
           </div>
         </div>
@@ -207,8 +227,8 @@
       <section id="tab-inbox" class="tab-pane">
         <div class="inbox-toolbar">
           <div>
-            <h2 style="font-size: 1.35rem; font-weight: 800; color: var(--text-primary);">
-              📥 AI Inbox — Pending Confirmation
+            <h2 style="font-family: var(--font-heading); font-size: 1.4rem; font-weight: 800; color: var(--text-primary);">
+              📥 AI Inbox — Pending Human Confirmation
             </h2>
             <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 2px;">
               Review detected commitments. Only confirmed commitments enter the official task tracking system.
@@ -264,12 +284,12 @@
               <option value="meeting">Meeting</option>
             </select>
 
-            <input type="text" id="taskSearchInput" class="form-input" placeholder="🔍 Search tasks or original quotes..." style="width: 240px;">
+            <input type="text" id="taskSearchInput" class="form-input" placeholder="🔍 Search tasks or quotes..." style="width: 230px;">
           </div>
 
-          <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <div style="display: flex; align-items: center; gap: 0.55rem;">
             <!-- View Mode Switcher -->
-            <button id="viewKanbanBtn" class="btn btn-secondary btn-sm" style="background: rgba(16,185,129,0.15); color: var(--color-primary);">
+            <button id="viewKanbanBtn" class="btn btn-secondary btn-sm" style="background: rgba(16,185,129,0.15); color: var(--color-primary); border-color: rgba(16,185,129,0.3);">
               📋 Kanban View
             </button>
             <button id="viewListBtn" class="btn btn-secondary btn-sm">
@@ -295,7 +315,7 @@
       <!-- TAB 4: COMMITMENT HISTORY & AUDIT TRAIL -->
       <section id="tab-history" class="tab-pane">
         <div class="content-card">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
             <div>
               <h3 class="content-card-title" style="margin-bottom: 0;">📜 Commitment Audit Trail & Source History</h3>
               <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 2px;">
@@ -332,6 +352,7 @@
           
           <div class="chart-card">
             <h3 class="content-card-title">📈 Commitment-to-Task Conversion Rate</h3>
+            <p style="font-size: 0.825rem; color: var(--text-secondary); margin-bottom: 1rem;">Ratio of detected promises converted into formal tracked deliverables.</p>
             <div style="height: 280px; display: flex; align-items: center; justify-content: center;">
               <canvas id="conversionDoughnutChart"></canvas>
             </div>
@@ -339,6 +360,7 @@
 
           <div class="chart-card">
             <h3 class="content-card-title">🛡️ Team Member Execution & Reliability Index</h3>
+            <p style="font-size: 0.825rem; color: var(--text-secondary); margin-bottom: 1rem;">Task delivery punctuality and promise completion score per teammate.</p>
             <div style="height: 280px; display: flex; align-items: center; justify-content: center;">
               <canvas id="reliabilityBarChart"></canvas>
             </div>
@@ -348,6 +370,7 @@
 
         <div class="content-card" style="margin-top: 1.5rem;">
           <h3 class="content-card-title">👥 Team Member Reliability Roster</h3>
+          <p style="font-size: 0.825rem; color: var(--text-secondary);">Real-time metrics tracking on-time delivery across engineering, product, and sales.</p>
           <div class="team-members-grid" id="teamMembersGrid">
             <!-- Rendered dynamically -->
           </div>
@@ -362,10 +385,10 @@
             Turn forgotten informal promises into tracked execution. Choose the plan that fits your organization.
           </p>
 
-          <div style="display: inline-flex; align-items: center; gap: 0.75rem; background: var(--bg-card); padding: 6px 14px; border-radius: var(--radius-full); border: 1px solid var(--border-subtle); margin-top: 1.25rem;">
+          <div style="display: inline-flex; align-items: center; gap: 0.75rem; background: var(--bg-card); padding: 7px 16px; border-radius: var(--radius-full); border: 1px solid var(--border-subtle); margin-top: 1.35rem; box-shadow: var(--shadow-sm);">
             <span style="font-size: 0.85rem; font-weight: 600;">Monthly Billing</span>
-            <input type="checkbox" id="pricingBillingToggle" style="cursor: pointer;">
-            <span style="font-size: 0.85rem; font-weight: 600; color: var(--color-primary);">Annual Billing (Save 20%)</span>
+            <input type="checkbox" id="pricingBillingToggle" style="accent-color: var(--color-primary); cursor: pointer; transform: scale(1.15);">
+            <span style="font-size: 0.85rem; font-weight: 700; color: var(--color-primary);">Annual Billing (Save 20%)</span>
           </div>
         </div>
 
@@ -440,24 +463,32 @@
         </div>
 
         <!-- Interactive ROI Calculator Card -->
-        <div style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 1.75rem; margin-top: 2rem;">
+        <div style="background: var(--bg-card); backdrop-filter: blur(20px); border: 1px solid var(--border-subtle); border-radius: var(--radius-xl); padding: 2rem; margin-top: 2rem; box-shadow: var(--shadow-md), var(--shadow-card-inner);">
           <h3 class="content-card-title">💡 CommitPulse ROI & Productivity Savings Calculator</h3>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 1rem;">
+          <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem;">Estimate the financial cost recovered by preventing dropped commitments across your team:</p>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2.5rem; align-items: center;">
             <div>
               <div class="form-group">
-                <label class="form-label">Number of Employees / Team Members: <strong id="roiEmployeesCount">25</strong></label>
-                <input type="range" id="roiEmployeesSlider" min="5" max="200" value="25" style="accent-color: var(--color-primary); cursor: pointer;">
+                <label class="form-label" style="display: flex; justify-content: space-between;">
+                  <span>Number of Employees / Team Members:</span>
+                  <strong id="roiEmployeesCount" style="color: var(--color-primary); font-size: 1rem;">25</strong>
+                </label>
+                <input type="range" id="roiEmployeesSlider" min="5" max="200" value="25" style="accent-color: var(--color-primary); cursor: pointer; width: 100%;">
               </div>
-              <div class="form-group" style="margin-top: 1rem;">
-                <label class="form-label">Estimated Forgotten Promises Prevented per Person/Month: <strong id="roiForgottenCount">6</strong></label>
-                <input type="range" id="roiForgottenSlider" min="1" max="20" value="6" style="accent-color: var(--color-primary); cursor: pointer;">
+
+              <div class="form-group" style="margin-top: 1.5rem;">
+                <label class="form-label" style="display: flex; justify-content: space-between;">
+                  <span>Estimated Forgotten Promises Prevented per Person / Month:</span>
+                  <strong id="roiForgottenCount" style="color: var(--color-primary); font-size: 1rem;">6</strong>
+                </label>
+                <input type="range" id="roiForgottenSlider" min="1" max="20" value="6" style="accent-color: var(--color-primary); cursor: pointer; width: 100%;">
               </div>
             </div>
 
-            <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: var(--radius-md); padding: 1.25rem; display: flex; flex-direction: column; justify-content: center;">
-              <div style="font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Estimated Monthly Value Saved</div>
-              <div style="font-size: 2.2rem; font-weight: 800; color: var(--color-primary); font-family: var(--font-sans);" id="roiSavedAmount">₹1,12,500</div>
-              <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Based on ~150 dropped balls prevented and 75 executive follow-up hours recovered per month.</div>
+            <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(6, 182, 212, 0.08)); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-lg); padding: 1.75rem; display: flex; flex-direction: column; justify-content: center; box-shadow: var(--shadow-card-inner);">
+              <div style="font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Estimated Monthly Value Saved</div>
+              <div style="font-size: 2.6rem; font-weight: 800; color: var(--color-primary); font-family: var(--font-heading); margin: 0.35rem 0;" id="roiSavedAmount">₹1,12,500</div>
+              <div style="font-size: 0.825rem; color: var(--text-muted); line-height: 1.45;">Based on ~150 dropped balls prevented and 75 executive follow-up hours recovered per month.</div>
             </div>
           </div>
         </div>

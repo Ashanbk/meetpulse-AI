@@ -143,13 +143,13 @@ export class InboxManager {
     if (filtered.length === 0) {
       this.container.innerHTML = `
         <div class="inbox-empty-card">
-          <div style="font-size: 3rem; margin-bottom: 0.75rem;">🎉</div>
-          <h3 style="font-size: 1.2rem; font-weight: 700; color: var(--text-primary);">All Caught Up in AI Inbox!</h3>
-          <p style="color: var(--text-secondary); font-size: 0.9rem; max-width: 480px; margin: 0.5rem auto 1.25rem auto;">
+          <div style="font-size: 3.5rem; margin-bottom: 0.75rem;">🎉</div>
+          <h3 style="font-family: var(--font-heading); font-size: 1.35rem; font-weight: 800; color: var(--text-primary);">All Caught Up in AI Inbox!</h3>
+          <p style="color: var(--text-secondary); font-size: 0.9rem; max-width: 480px; margin: 0.5rem auto 1.5rem auto; line-height: 1.5;">
             No pending commitments waiting for confirmation. CommitPulse is actively monitoring your communications for hidden work promises.
           </p>
           <button class="btn btn-primary" onclick="window.commitPulseApp.triggerDemoSim()">
-            ✨ Ingest Sample Communication
+            ✨ Ingest Sample Corporate Communication
           </button>
         </div>
       `;
@@ -161,7 +161,11 @@ export class InboxManager {
     filtered.forEach(c => {
       const sourceIcon = c.sourceType === "Slack" ? "💬" : c.sourceType === "Email" ? "✉️" : "🎙️";
       const sourceClass = `source-${c.sourceType.toLowerCase()}`;
-      const confColor = c.confidence >= 90 ? "var(--color-success)" : c.confidence >= 80 ? "var(--color-accent)" : "var(--color-warning)";
+      const confColor = c.confidence >= 90 ? "var(--color-primary)" : c.confidence >= 80 ? "var(--color-accent)" : "var(--color-warning)";
+      
+      // Calculate SVG stroke offset for 24px circle (r=9, circumference = 2 * PI * 9 ~= 56.5)
+      const circumference = 56.54;
+      const strokeOffset = circumference - (c.confidence / 100) * circumference;
 
       html += `
         <div class="inbox-card" id="card-${c.id}">
@@ -171,9 +175,12 @@ export class InboxManager {
               <span>${c.sourceType}: <strong>${c.sourceChannel}</strong></span>
             </div>
 
-            <div class="confidence-badge" style="border-color: ${confColor}; color: ${confColor};" title="AI Detection Confidence Score">
-              <span class="confidence-dot" style="background: ${confColor};"></span>
-              <span>${c.confidence}% Match</span>
+            <div class="confidence-meter-chip" title="AI Extraction Confidence Score">
+              <svg class="radial-meter-svg" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="9" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="2.5"></circle>
+                <circle cx="12" cy="12" r="9" fill="none" stroke="${confColor}" stroke-width="2.5" stroke-dasharray="${circumference}" stroke-dashoffset="${strokeOffset}" stroke-linecap="round"></circle>
+              </svg>
+              <span style="color: ${confColor};">${c.confidence}% Match</span>
             </div>
           </div>
 
@@ -184,7 +191,7 @@ export class InboxManager {
 
           <div class="extracted-details-deck">
             <div class="extracted-item">
-              <span class="extracted-label">🎯 Action / Task:</span>
+              <span class="extracted-label">🎯 Action Item:</span>
               <span class="extracted-value title-val">${c.taskTitle}</span>
             </div>
 
@@ -204,10 +211,10 @@ export class InboxManager {
               </div>
             </div>
 
-            <div class="extracted-row" style="margin-top: 0.35rem;">
+            <div class="extracted-row" style="margin-top: 0.25rem;">
               <div class="extracted-item">
                 <span class="extracted-label">🗣️ Requester:</span>
-                <span class="extracted-sub">${c.requester}</span>
+                <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">${c.requester}</span>
               </div>
               <div class="extracted-item">
                 <span class="extracted-label">⚡ Priority:</span>
@@ -226,8 +233,8 @@ export class InboxManager {
             <button class="btn btn-secondary btn-sm" onclick="window.commitPulseApp.openDelegateModal('${c.id}')" title="Reassign task to another team member">
               🔄 Delegate
             </button>
-            <button class="btn btn-secondary btn-dismiss" onclick="window.commitPulseApp.dismissCommitment('${c.id}')" title="Ignore - Not a formal commitment">
-              ❌ Ignore
+            <button class="btn btn-secondary btn-sm" onclick="window.commitPulseApp.dismissCommitment('${c.id}')" title="Ignore - Not a formal commitment" style="margin-left: auto; color: var(--text-muted);">
+              ✕ Ignore
             </button>
           </div>
         </div>
