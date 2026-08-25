@@ -59,22 +59,26 @@ class MeetPulseApp {
     // Register Service Worker for offline capability & PWA
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').then((reg) => {
-          console.log('Meetpulse Service Worker Registered:', reg.scope);
+        navigator.serviceWorker.register('sw.js').then((reg) => {
+          console.log('Meetpulse PWA Service Worker Registered:', reg.scope);
         }).catch((err) => {
-          console.log('Meetpulse Service Worker registration skipped:', err);
+          // Fallback to relative path
+          navigator.serviceWorker.register('./sw.js').catch(() => {});
         });
       });
     }
 
-    // Capture PWA Install Prompt
+    // Always keep install buttons visible
+    const headerBtn = document.getElementById('installPwaHeaderBtn');
+    const sidebarBtn = document.getElementById('installPwaSidebarBtn');
+    if (headerBtn) headerBtn.style.setProperty('display', 'inline-flex', 'important');
+    if (sidebarBtn) sidebarBtn.style.setProperty('display', 'inline-flex', 'important');
+
+    // Capture Native PWA Install Prompt
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       this.deferredPrompt = e;
-      const headerBtn = document.getElementById('installPwaHeaderBtn');
-      const sidebarBtn = document.getElementById('installPwaSidebarBtn');
-      if (headerBtn) headerBtn.style.display = 'inline-flex';
-      if (sidebarBtn) sidebarBtn.style.display = 'inline-flex';
+      console.log('Native PWA install prompt ready.');
     });
 
     window.addEventListener('appinstalled', () => {

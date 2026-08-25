@@ -1,5 +1,5 @@
-// sw.js - Meetpulse Service Worker for Offline Execution & Standalone PWA
-const CACHE_NAME = 'meetpulse-v1';
+// sw.js - Meetpulse Robust Service Worker (Vercel & GitHub Pages Compatible)
+const CACHE_NAME = 'meetpulse-pwa-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -17,8 +17,15 @@ const ASSETS_TO_CACHE = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      // Robust caching: cache each asset individually so one failure does not break installation
+      await Promise.allSettled(
+        ASSETS_TO_CACHE.map((url) =>
+          fetch(url, { cache: 'no-cache' }).then((res) => {
+            if (res.ok) return cache.put(url, res);
+          }).catch(() => {})
+        )
+      );
     }).then(() => self.skipWaiting())
   );
 });
@@ -46,17 +53,10 @@ self.addEventListener('fetch', (event) => {
         return cachedResponse;
       }
       return fetch(event.request).then((response) => {
-        if (!response || response.status !== 200 || response.type !== 'basic') {
-          return response;
-        }
-        const responseToCache = response.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
         return response;
       }).catch(() => {
         if (event.request.headers.get('accept')?.includes('text/html')) {
-          return caches.match('./index.html');
+          return caches.match('./index.html') || caches.match('./');
         }
       });
     })
