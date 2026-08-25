@@ -1,4 +1,4 @@
-// app.js - Meetpulse Master Application Orchestrator (Password-Protected Auth | INR Pricing | Mobile Responsive)
+// app.js - Meetpulse Master Application Orchestrator (Role-Based Admin Access | Automated Email Scheduling | Password Protection)
 import { DEFAULT_USERS, PRELOADED_COMMS, INITIAL_CONFIRMED_TASKS } from './mockCommsData.js';
 import { CommitmentEngine } from './commitmentEngine.js';
 import { InboxManager } from './inboxManager.js';
@@ -9,6 +9,7 @@ class MeetPulseApp {
     this.currentUser = null;
     this.registeredUsers = [];
     this.communicationStreams = [];
+    this.scheduledEmails = [];
     this.commitmentEngine = new CommitmentEngine();
     this.inboxManager = null;
     this.taskManager = null;
@@ -23,6 +24,7 @@ class MeetPulseApp {
 
   init() {
     this.initUsers();
+    this.initEmails();
     this.initInbox();
     this.initTaskManager();
     this.bindEvents();
@@ -56,7 +58,6 @@ class MeetPulseApp {
     if (storedUsers) {
       try {
         this.registeredUsers = JSON.parse(storedUsers);
-        // Ensure all existing users have a password
         this.registeredUsers.forEach(u => {
           if (!u.password) u.password = u.isAdmin ? 'admin123' : 'employee123';
         });
@@ -76,6 +77,39 @@ class MeetPulseApp {
     this.commitmentEngine.setRegisteredUsers(this.registeredUsers);
     this.renderRegisteredAccountsDeck();
     this.renderTeamMembers();
+  }
+
+  initEmails() {
+    const stored = localStorage.getItem('meetpulse_scheduled_emails');
+    if (stored) {
+      try {
+        this.scheduledEmails = JSON.parse(stored);
+      } catch (e) {
+        this.scheduledEmails = [];
+      }
+    } else {
+      this.scheduledEmails = [
+        {
+          id: `email-${Date.now()}-welcome`,
+          toEmail: 'all@meetpulse.ai',
+          toName: 'All Team Members',
+          from: 'notifications@meetpulse.ai',
+          subject: 'Welcome to Meetpulse Workspace Notifications',
+          body: 'Automated email scheduling is active. You will receive real-time digests, task assignments, and pre-deadline alerts directly to this workspace inbox.',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          dateStr: new Date().toLocaleDateString(),
+          isRead: false,
+          triggerType: 'System Welcome'
+        }
+      ];
+      this.saveEmails();
+    }
+  }
+
+  saveEmails() {
+    localStorage.setItem('meetpulse_scheduled_emails', JSON.stringify(this.scheduledEmails));
+    this.updateNotificationBadges();
+    this.renderEmailNotificationFeed();
   }
 
   setCurrentUser(user) {
@@ -102,10 +136,26 @@ class MeetPulseApp {
       }
     }
 
+    this.applyRolePermissions();
     this.populateTeamDropdowns();
     this.renderTeamMembers();
     this.updateDashboardKPIs();
+    this.updateNotificationBadges();
+    this.renderEmailNotificationFeed();
     this.renderAnalytics();
+  }
+
+  applyRolePermissions() {
+    const isAdmin = this.currentUser && (this.currentUser.isAdmin || this.currentUser.role === 'Administrator');
+
+    // Admin-only elements
+    document.querySelectorAll('.admin-only-element').forEach(el => {
+      el.style.display = isAdmin ? '' : 'none';
+    });
+
+    // Employee Notice Banner
+    const notice = document.getElementById('employeeViewNoticeBanner');
+    if (notice) notice.style.display = isAdmin ? 'none' : 'block';
   }
 
   openAuthOverlay() {
@@ -123,11 +173,12 @@ class MeetPulseApp {
     const list = document.getElementById('employeePresetsList');
     if (!list) return;
 
+    // Filter only employees for the quick preset list (Admin is omitted as requested)
     const employees = this.registeredUsers.filter(u => !u.isAdmin && u.role !== 'Administrator');
     if (employees.length === 0) {
       list.innerHTML = `
         <div style="font-size: 0.74rem; color: var(--text-muted); padding: 0.25rem 0;">
-          No employee accounts created yet.
+          No employee accounts created yet. Administrator must sign in to create employees.
         </div>
       `;
       return;
@@ -167,7 +218,7 @@ class MeetPulseApp {
 
     if (!user) {
       if (err) {
-        err.textContent = `No account found for "${email}". Please verify your email or sign in as Administrator to create this employee.`;
+        err.textContent = `No account found for "${email}". Please enter valid credentials or contact your Administrator.`;
         err.style.display = 'block';
       }
       return;
@@ -175,7 +226,7 @@ class MeetPulseApp {
 
     if (user.password !== trimmedPass) {
       if (err) {
-        err.textContent = `Incorrect password for ${email}. Please check and try again.`;
+        err.textContent = `Incorrect password for ${email}. Please verify and try again.`;
         err.style.display = 'block';
       }
       return;
@@ -194,6 +245,139 @@ class MeetPulseApp {
     this.showToast('Signed out of workspace');
   }
 
+  // Automated Email Notification Engine
+  dispatchEmailNotification({ toEmail, toName, subject, body, taskId = null, triggerType = 'Automated Reminder' }) {
+    const newEmail = {
+      id: `email-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      toEmail,
+      toName,
+      from: 'notifications@meetpulse.ai',
+      subject,
+      body,
+      taskId,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      dateStr: new Date().toLocaleDateString(),
+      isRead: false,
+      triggerType
+    };
+
+    this.scheduledEmails.unshift(newEmail);
+    this.saveEmails();
+    this.showToast(`Automated email sent to ${toEmail}: "${subject}"`);
+  }
+
+  broadcastMorningDigest() {
+    if (!this.currentUser || (!this.currentUser.isAdmin && this.currentUser.role !== 'Administrator')) {
+      this.showToast('Administrator privileges required to broadcast emails.');
+      return;
+    }
+
+    const tasks = this.taskManager ? this.taskManager.getTasks() : [];
+    const activeTasksCount = tasks.filter(t => t.status !== 'done').length;
+
+    this.registeredUsers.forEach(user => {
+      const userTasks = tasks.filter(t => t.owner === user.name && t.status !== 'done');
+      const taskSummary = userTasks.length > 0
+        ? `You have ${userTasks.length} active deliverable(s): ${userTasks.map(t => `[${t.id}] ${t.title}`).join(', ')}.`
+        : 'All your current deliverables are completed. Ready for new sprint commitments!';
+
+      this.dispatchEmailNotification({
+        toEmail: user.email,
+        toName: user.name,
+        subject: `Morning Standup Digest: ${user.name} (${new Date().toLocaleDateString()})`,
+        body: `Good morning ${user.name},\n\nHere is your scheduled daily commitment briefing from Meetpulse AI.\n\n${taskSummary}\n\nOrganization Active Deliverables: ${activeTasksCount}.\nTarget Delivery: Please ensure all updates are synchronized before the daily sync.`,
+        triggerType: 'Scheduled Morning Digest'
+      });
+    });
+
+    this.showToast(`Broadcasted morning digest emails to all ${this.registeredUsers.length} team members!`);
+  }
+
+  updateNotificationBadges() {
+    const currentEmail = this.currentUser ? this.currentUser.email.toLowerCase() : '';
+    const userEmails = this.scheduledEmails.filter(e => e.toEmail === 'all@meetpulse.ai' || e.toEmail.toLowerCase() === currentEmail);
+    const unreadCount = userEmails.filter(e => !e.isRead).length;
+
+    const bellBadge = document.getElementById('headerNotificationBadge');
+    if (bellBadge) {
+      bellBadge.textContent = unreadCount;
+      bellBadge.style.display = unreadCount > 0 ? 'inline-block' : 'none';
+    }
+
+    const sidebarBadge = document.getElementById('sidebarEmailBadge');
+    if (sidebarBadge) {
+      sidebarBadge.textContent = unreadCount;
+    }
+
+    const heroStat = document.getElementById('statHeroEmails');
+    if (heroStat) {
+      heroStat.textContent = this.scheduledEmails.length;
+    }
+  }
+
+  renderEmailNotificationFeed() {
+    const container = document.getElementById('emailNotificationFeedContainer');
+    if (!container) return;
+
+    const currentEmail = this.currentUser ? this.currentUser.email.toLowerCase() : '';
+    const userEmails = this.scheduledEmails.filter(e => e.toEmail === 'all@meetpulse.ai' || e.toEmail.toLowerCase() === currentEmail);
+
+    if (userEmails.length === 0) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 2.5rem 1.5rem; color: var(--text-muted);">
+          <strong>No email notifications received yet.</strong>
+          <p style="font-size: 0.84rem; margin-top: 4px;">Scheduled standup digests, task assignments, and pre-deadline alerts will arrive here.</p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = userEmails.map(mail => `
+      <div class="notification-feed-card ${!mail.isRead ? 'unread' : ''}" id="card-${mail.id}">
+        <div class="email-meta-header">
+          <span>From: <strong>${mail.from}</strong> → To: <strong>${mail.toEmail}</strong> (${mail.toName})</span>
+          <span>${mail.dateStr} at ${mail.timestamp}</span>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap;">
+          <div class="email-subject-line">${mail.subject}</div>
+          <span class="badge badge-primary" style="font-size: 0.65rem;">${mail.triggerType}</span>
+        </div>
+        <div class="email-body-snippet" style="white-space: pre-wrap;">${this.escapeHtml(mail.body)}</div>
+        <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem; margin-top: 0.35rem;">
+          ${mail.taskId ? `
+            <button class="btn btn-secondary btn-sm" onclick="window.commitPulseApp.openTaskModal('${mail.taskId}')">
+              View Deliverable [${mail.taskId}]
+            </button>
+          ` : ''}
+          ${!mail.isRead ? `
+            <button class="btn btn-primary btn-sm" onclick="window.commitPulseApp.markEmailAsRead('${mail.id}')">
+              Mark as Read
+            </button>
+          ` : '<span style="font-size: 0.72rem; color: var(--text-muted);">Read</span>'}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  markEmailAsRead(emailId) {
+    const item = this.scheduledEmails.find(e => e.id === emailId);
+    if (item) {
+      item.isRead = true;
+      this.saveEmails();
+    }
+  }
+
+  markAllEmailsAsRead() {
+    const currentEmail = this.currentUser ? this.currentUser.email.toLowerCase() : '';
+    this.scheduledEmails.forEach(e => {
+      if (e.toEmail === 'all@meetpulse.ai' || e.toEmail.toLowerCase() === currentEmail) {
+        e.isRead = true;
+      }
+    });
+    this.saveEmails();
+    this.showToast('All notifications marked as read');
+  }
+
   initInbox() {
     this.inboxManager = new InboxManager('inboxContainer', {
       onTaskConfirmed: (task) => {
@@ -204,6 +388,19 @@ class MeetPulseApp {
         this.renderRadarRisks();
         this.updateInChatCardStatus(task.id, 'confirmed', task.id);
         this.showToast(`Approved Deliverable [${task.id}] for ${task.owner}`);
+
+        // Automated Email Trigger on Task Assignment
+        const assignedUser = this.registeredUsers.find(u => u.name.toLowerCase() === task.owner.toLowerCase());
+        const targetEmail = assignedUser ? assignedUser.email : 'team@meetpulse.ai';
+
+        this.dispatchEmailNotification({
+          toEmail: targetEmail,
+          toName: task.owner,
+          subject: `Action Required: Deliverable [${task.id}] Assigned to You`,
+          body: `Hello ${task.owner},\n\nA new deliverable has been extracted from "${task.sourceChannel}" and approved for your attention:\n\nTask: ${task.title}\nTarget Deadline: ${task.deadline}\nPriority: ${task.priority}\n\nOriginal Quote: "${task.originalSnippet}"\n\nPlease review and track this in your Meetpulse Deliverables Board.`,
+          taskId: task.id,
+          triggerType: 'Task Assignment'
+        });
       },
       onCommitmentDismissed: (item) => {
         this.updateDashboardKPIs();
@@ -255,20 +452,6 @@ class MeetPulseApp {
       });
     }
 
-    // 1-Click Fast Admin Sign In Fill
-    document.getElementById('quickLoginAdminBtn')?.addEventListener('click', () => {
-      this.fillCredentials('admin@meetpulse.ai', 'admin123');
-      this.loginWithCredentials('admin@meetpulse.ai', 'admin123');
-    });
-    
-    // Quick create employee from login screen
-    document.getElementById('quickCreateEmpFromLoginBtn')?.addEventListener('click', () => {
-      this.fillCredentials('admin@meetpulse.ai', 'admin123');
-      this.loginWithCredentials('admin@meetpulse.ai', 'admin123');
-      this.switchView('view-analytics');
-      this.openAddMemberModal();
-    });
-
     // Switch User / Logout
     document.getElementById('switchUserBtn')?.addEventListener('click', () => this.logout());
     document.getElementById('userProfileTrigger')?.addEventListener('click', () => this.logout());
@@ -298,6 +481,26 @@ class MeetPulseApp {
         this.switchView(viewId);
         if (window.innerWidth <= 992) closeSidebar();
       });
+    });
+
+    // Top Header Notification Bell
+    document.getElementById('headerNotificationBellBtn')?.addEventListener('click', () => {
+      this.switchView('view-notifications');
+    });
+
+    // Prompt Chips
+    document.getElementById('chipViewNotifications')?.addEventListener('click', () => {
+      this.switchView('view-notifications');
+    });
+
+    // Broadcast Digest Email Trigger
+    document.getElementById('broadcastDigestEmailBtn')?.addEventListener('click', () => {
+      this.broadcastMorningDigest();
+    });
+
+    // Mark All Emails as Read Trigger
+    document.getElementById('markAllEmailsReadBtn')?.addEventListener('click', () => {
+      this.markAllEmailsAsRead();
     });
 
     // Brand Home Trigger
@@ -335,7 +538,7 @@ class MeetPulseApp {
       this.switchView('view-inbox');
     });
 
-    // Employee Creator Triggers (Everywhere in the UI)
+    // Employee Creator Triggers (Admin Only)
     const triggerEmpCreator = () => {
       if (this.currentUser && !this.currentUser.isAdmin && this.currentUser.role !== 'Administrator') {
         this.showToast('Administrator privileges required to create employee accounts.');
@@ -348,7 +551,6 @@ class MeetPulseApp {
     document.getElementById('quickCreateEmpHeaderBtn')?.addEventListener('click', triggerEmpCreator);
     document.getElementById('openAddMemberSidebarBtn')?.addEventListener('click', triggerEmpCreator);
     document.getElementById('chipCreateEmployee')?.addEventListener('click', triggerEmpCreator);
-    document.getElementById('chipManageEmployees')?.addEventListener('click', () => this.switchView('view-analytics'));
     document.getElementById('openAddMemberBtn')?.addEventListener('click', triggerEmpCreator);
 
     // Ingest Modals & Triggers
@@ -436,9 +638,13 @@ class MeetPulseApp {
     document.getElementById('exportAuditCsvBtn')?.addEventListener('click', () => this.exportAuditCSV());
     document.getElementById('saveAddMemberBtn')?.addEventListener('click', () => this.saveAddMember());
 
-    // Inline Employee Creation Form in Team View
+    // Inline Employee Creation Form in Team View (Admin Only)
     document.getElementById('inlineCreateEmployeeForm')?.addEventListener('submit', (e) => {
       e.preventDefault();
+      if (!this.currentUser || (!this.currentUser.isAdmin && this.currentUser.role !== 'Administrator')) {
+        this.showToast('Administrator privileges required to create employee accounts.');
+        return;
+      }
       const name = document.getElementById('inlineEmpName')?.value.trim();
       const email = document.getElementById('inlineEmpEmail')?.value.trim().toLowerCase();
       const password = document.getElementById('inlineEmpPassword')?.value.trim();
@@ -487,6 +693,10 @@ class MeetPulseApp {
     if (viewId === 'view-analytics') {
       setTimeout(() => this.renderAnalytics(), 80);
     }
+    if (viewId === 'view-notifications') {
+      this.renderEmailNotificationFeed();
+      this.updateNotificationBadges();
+    }
     if (viewId === 'view-history') {
       this.renderAuditHistory();
     }
@@ -526,8 +736,8 @@ class MeetPulseApp {
               <button class="btn btn-primary" onclick="window.commitPulseApp.openIngestModal()">
                 Ingest Meeting Audio / Notes
               </button>
-              <button class="btn btn-secondary" onclick="window.commitPulseApp.switchView('view-analytics')">
-                + Create Employee Account
+              <button class="btn btn-secondary" onclick="window.commitPulseApp.switchView('view-notifications')">
+                View Email Notifications
               </button>
             </div>
           </div>
@@ -696,7 +906,7 @@ class MeetPulseApp {
                 <li><em>"Please deploy the database backup script by Friday 5:00 PM"</em></li>
                 <li><em>"I will finalize the API documentation tomorrow before noon"</em></li>
                 <li><em>"What deliverables are currently at risk?"</em></li>
-                <li><em>"Show team punctuality scores"</em></li>
+                <li><em>"Show scheduled email digests"</em></li>
               </ul>
             </div>
           </div>
@@ -834,8 +1044,8 @@ class MeetPulseApp {
     const statHeroActive = document.getElementById('statHeroActive');
     if (statHeroActive) statHeroActive.textContent = taskStats.total;
 
-    const statHeroEmployees = document.getElementById('statHeroEmployees');
-    if (statHeroEmployees) statHeroEmployees.textContent = this.registeredUsers.length;
+    const statHeroEmails = document.getElementById('statHeroEmails');
+    if (statHeroEmails) statHeroEmails.textContent = this.scheduledEmails.length;
   }
 
   renderRadarRisks() {
@@ -872,7 +1082,7 @@ class MeetPulseApp {
             Details
           </button>
           <button class="btn btn-primary btn-sm" onclick="window.commitPulseApp.sendSlackNudge('${r.id}', '${r.owner}')">
-            Send Nudge
+            Send Email Nudge
           </button>
         </div>
       </div>
@@ -880,7 +1090,20 @@ class MeetPulseApp {
   }
 
   sendSlackNudge(taskId, owner) {
-    this.showToast(`Automated reminder nudge sent to ${owner} for [${taskId}]`);
+    const task = this.taskManager ? this.taskManager.getTasks().find(t => t.id === taskId) : null;
+    const taskUser = this.registeredUsers.find(u => u.name.toLowerCase() === owner.toLowerCase());
+    const targetEmail = taskUser ? taskUser.email : 'employee@company.com';
+
+    this.dispatchEmailNotification({
+      toEmail: targetEmail,
+      toName: owner,
+      subject: `URGENT: Pre-Deadline Reminder for [${taskId}]`,
+      body: `Hi ${owner},\n\nThis is an automated priority reminder from Meetpulse.\n\nDeliverable: ${task ? task.title : 'Action Item'}\nTarget Deadline: ${task ? task.deadline : 'Approaching Soon'}\n\nPlease update your progress or mark as completed in the Deliverables Board.`,
+      taskId,
+      triggerType: 'Urgent Pre-Deadline Nudge'
+    });
+
+    this.showToast(`Automated pre-deadline reminder email sent to ${owner}`);
   }
 
   renderAnalytics() {
@@ -963,6 +1186,8 @@ class MeetPulseApp {
     const grid = document.getElementById('teamMembersGrid');
     if (!grid) return;
 
+    const isAdmin = this.currentUser && (this.currentUser.isAdmin || this.currentUser.role === 'Administrator');
+
     grid.innerHTML = this.registeredUsers.map(m => `
       <div class="team-member-card">
         <div class="avatar-initials" style="width: 38px; height: 38px; font-size: 0.85rem;">${m.avatar || 'ST'}</div>
@@ -975,10 +1200,12 @@ class MeetPulseApp {
           <div style="font-size: 0.72rem; color: var(--text-muted);">${m.role} • ${m.department || 'Operations'}</div>
         </div>
         <div style="display: flex; align-items: center; gap: 0.35rem;">
-          <button class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 0.7rem;" onclick="window.commitPulseApp.fillCredentials('${m.email}', '${m.password || (m.isAdmin ? 'admin123' : 'employee123')}')" title="Autofill Login Credentials">
-            Autofill
-          </button>
           ${!m.isAdmin ? `
+            <button class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 0.7rem;" onclick="window.commitPulseApp.fillCredentials('${m.email}', '${m.password || 'employee123'}')" title="Autofill Login Credentials">
+              Autofill
+            </button>
+          ` : ''}
+          ${(isAdmin && !m.isAdmin) ? `
             <button class="btn btn-danger btn-sm" style="padding: 2px 7px; font-size: 0.7rem;" onclick="window.commitPulseApp.deleteEmployee('${m.id}')" title="Delete Employee Account">
               Delete
             </button>
@@ -1058,6 +1285,10 @@ class MeetPulseApp {
   }
 
   openAddMemberModal() {
+    if (!this.currentUser || (!this.currentUser.isAdmin && this.currentUser.role !== 'Administrator')) {
+      this.showToast('Administrator privileges required to create employee accounts.');
+      return;
+    }
     document.getElementById('addMemberModal')?.classList.add('active');
   }
 
@@ -1066,6 +1297,11 @@ class MeetPulseApp {
   }
 
   createEmployeeAccount({ name, email, password, role, dept }) {
+    if (!this.currentUser || (!this.currentUser.isAdmin && this.currentUser.role !== 'Administrator')) {
+      this.showToast('Administrator privileges required to create employee accounts.');
+      return;
+    }
+
     if (!name || !email) {
       this.showToast('Please enter employee name and email ID');
       return;
@@ -1097,6 +1333,16 @@ class MeetPulseApp {
     this.renderTeamMembers();
     this.renderAnalytics();
     this.updateDashboardKPIs();
+
+    // Send Welcome Email to the new employee
+    this.dispatchEmailNotification({
+      toEmail: email,
+      toName: name,
+      subject: 'Welcome to Meetpulse — Your Account Credentials',
+      body: `Hello ${name},\n\nYour employee account has been created by your Administrator.\n\nLogin Email: ${email}\nPassword: ${newMember.password}\nWorkspace Role: ${newMember.role}\n\nPlease sign in at http://localhost:5000 or production URL to track your meeting commitments and deliverables.`,
+      triggerType: 'Account Registration'
+    });
+
     this.showToast(`Created account for ${name} (${email}). Password: ${newMember.password}`);
   }
 

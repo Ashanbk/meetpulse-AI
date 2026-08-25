@@ -22,7 +22,7 @@
         <div class="brand-icon-box" style="width: 48px; height: 48px; font-size: 1.25rem; margin: 0 auto 1.25rem auto;">MP</div>
         <h2 style="font-family: var(--font-heading); font-size: 1.5rem; font-weight: 800; color: var(--text-primary);">Meetpulse Workspace</h2>
         <p style="font-size: 0.86rem; color: var(--text-secondary); margin-top: 0.35rem;">
-          Secure password-protected sign in for Administrators and Employees.
+          Secure password-protected login for Administrators and Employees.
         </p>
 
         <!-- Main Password-Protected Login Form -->
@@ -46,7 +46,7 @@
           </div>
 
           <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.75rem; font-size: 0.9rem; font-weight: 700; margin-top: 0.25rem;">
-            Sign In with Password
+            Sign In
           </button>
         </form>
 
@@ -54,31 +54,21 @@
           <!-- Injected via JS -->
         </div>
 
-        <!-- Quick Fill Credentials / Registered Accounts -->
-        <div id="quickCredentialsDeck" style="background: var(--bg-subtle); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 0.85rem; text-align: left; margin-bottom: 1rem;">
+        <!-- Registered Accounts Quick List (Employees only) -->
+        <div id="quickCredentialsDeck" style="background: var(--bg-subtle); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 0.85rem; text-align: left; margin-bottom: 0.75rem;">
           <div style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 800; margin-bottom: 0.45rem; letter-spacing: 0.05em; display: flex; align-items: center; justify-content: space-between;">
-            <span>Default / Registered Credentials:</span>
-            <span style="color: var(--color-primary); font-size: 0.68rem;">1-Click Autofill</span>
+            <span>Registered Employees:</span>
+            <span style="color: var(--color-primary); font-size: 0.68rem;">Click to Autofill</span>
           </div>
 
-          <!-- Admin Quick Preset -->
-          <div class="team-member-card" style="padding: 0.45rem 0.65rem; cursor: pointer; background: var(--bg-card); margin-bottom: 0.4rem;" onclick="window.commitPulseApp.fillCredentials('admin@meetpulse.ai', 'admin123')">
-            <span class="avatar-initials avatar-sm">AD</span>
-            <div style="flex: 1; overflow: hidden;">
-              <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary);">Administrator</div>
-              <div style="font-size: 0.72rem; color: var(--text-secondary); font-family: var(--font-mono);">admin@meetpulse.ai • admin123</div>
-            </div>
-            <span style="font-size: 0.7rem; color: var(--color-primary); font-weight: 700;">Fill →</span>
-          </div>
-
-          <div id="employeePresetsList" style="display: flex; flex-direction: column; gap: 0.4rem; max-height: 110px; overflow-y: auto;">
+          <div id="employeePresetsList" style="display: flex; flex-direction: column; gap: 0.4rem; max-height: 120px; overflow-y: auto;">
             <!-- Dynamically populated employees -->
           </div>
         </div>
 
-        <button id="quickCreateEmpFromLoginBtn" class="btn btn-sm" style="width: 100%; color: var(--color-primary); background: transparent; border: none; font-weight: 700; cursor: pointer;">
-          + Need to create an employee account? Click here
-        </button>
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">
+          Administrator Login: Enter <strong style="color: var(--text-primary);">admin@meetpulse.ai</strong> & password.
+        </div>
       </div>
     </div>
   </div>
@@ -106,7 +96,8 @@
         <button id="openIngestModalBtn" class="btn-new-ingest">
           <span>Ingest Communication</span>
         </button>
-        <button id="openAddMemberSidebarBtn" class="btn-create-emp-sidebar" title="Create New Employee Account">
+        <!-- Admin Only Button -->
+        <button id="openAddMemberSidebarBtn" class="btn-create-emp-sidebar admin-only-element" title="Create New Employee Account">
           <span>+ Create Employee</span>
         </button>
       </div>
@@ -161,6 +152,12 @@
                 <span class="sidebar-item-label">Milestone Risk Radar</span>
               </div>
               <span class="sidebar-badge" id="sidebarRisksBadge" style="background: rgba(239,68,68,0.15); color: var(--color-danger); border: 1px solid rgba(239,68,68,0.3);">0</span>
+            </li>
+            <li class="sidebar-item" data-view="view-notifications" id="navViewNotifications">
+              <div class="sidebar-item-left">
+                <span class="sidebar-item-label">Email Notifications</span>
+              </div>
+              <span class="sidebar-badge badge-primary" id="sidebarEmailBadge">0</span>
             </li>
             <li class="sidebar-item" data-view="view-analytics" id="navViewAnalytics">
               <div class="sidebar-item-left">
@@ -241,7 +238,15 @@
             </div>
 
             <div class="chat-header-actions">
-              <button id="quickCreateEmpHeaderBtn" class="btn btn-secondary btn-sm" title="Create New Employee Account">
+              <!-- Notification Bell for Employees & Admin -->
+              <button id="headerNotificationBellBtn" class="notification-bell-btn" title="View Scheduled Email Notifications">
+                <svg class="icon-svg" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                <span>Emails</span>
+                <span id="headerNotificationBadge" class="notification-badge-unread">0</span>
+              </button>
+
+              <!-- Admin Only Button -->
+              <button id="quickCreateEmpHeaderBtn" class="btn btn-secondary btn-sm admin-only-element" title="Create New Employee Account">
                 + Create Employee
               </button>
               <button id="quickInboxBtn" class="btn btn-secondary btn-sm" title="View Action Queue">
@@ -283,8 +288,8 @@
                   <strong id="statHeroActive">0</strong>
                 </div>
                 <div class="welcome-stat-pill">
-                  <span>Registered Employees:</span>
-                  <strong id="statHeroEmployees">1</strong>
+                  <span>Scheduled Emails Sent:</span>
+                  <strong id="statHeroEmails">0</strong>
                 </div>
               </div>
             </div>
@@ -298,7 +303,8 @@
 
           <!-- Prompt Suggestion Chips -->
           <div class="chat-prompt-suggestions-row">
-            <button class="prompt-chip" id="chipCreateEmployee">
+            <!-- Admin Only Chip -->
+            <button class="prompt-chip admin-only-element" id="chipCreateEmployee">
               + Create Employee ID
             </button>
             <button class="prompt-chip" id="chipIngestMeeting">
@@ -307,8 +313,8 @@
             <button class="prompt-chip" id="chipCheckRadar">
               Check Milestone Deadlines
             </button>
-            <button class="prompt-chip" id="chipManageEmployees">
-              Team & Employees Roster
+            <button class="prompt-chip" id="chipViewNotifications">
+              View Email Notifications
             </button>
             <button class="prompt-chip" id="chipCustomPromise">
               Type custom action item...
@@ -461,17 +467,91 @@
       </section>
 
       <!-- ======================================================================
-           VIEW 5: TEAM & EMPLOYEES (#view-analytics)
+           VIEW 5: EMAIL NOTIFICATIONS & SCHEDULING (#view-notifications)
+           ====================================================================== -->
+      <section id="view-notifications" class="view-pane">
+        <div class="view-content-wrapper">
+          <div class="view-header">
+            <div class="view-title-group">
+              <h2 class="view-title">Scheduled Email Notifications & Mailbox</h2>
+              <p class="view-desc">
+                All team members receive automated email dispatches and reminders directly inside Meetpulse.
+              </p>
+            </div>
+
+            <!-- Admin Broadcast Button -->
+            <button id="broadcastDigestEmailBtn" class="btn btn-primary btn-sm admin-only-element">
+              Broadcast Morning Email Digest Now
+            </button>
+          </div>
+
+          <!-- Admin Notification Scheduling Settings Card -->
+          <div id="notificationScheduleConfigCard" class="content-card admin-only-element" style="margin-bottom: 1.5rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+              <div>
+                <span class="badge badge-primary" style="font-size: 0.72rem;">ADMINISTRATOR SETTINGS</span>
+                <h3 class="content-card-title" style="margin-top: 0.25rem;">Automated Email Scheduling Rules</h3>
+              </div>
+            </div>
+            <p style="font-size: 0.825rem; color: var(--text-secondary); margin-bottom: 1rem;">
+              Configure when employees receive automated email reminders for their deliverables.
+            </p>
+
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+              <div class="schedule-rule-box">
+                <div>
+                  <strong style="font-size: 0.86rem; color: var(--text-primary);">Morning Standup Digest Email</strong>
+                  <div style="font-size: 0.76rem; color: var(--text-muted);">Dispatched daily at 09:00 AM to all active employees.</div>
+                </div>
+                <input type="checkbox" checked style="accent-color: var(--color-primary); cursor: pointer; transform: scale(1.2);">
+              </div>
+
+              <div class="schedule-rule-box">
+                <div>
+                  <strong style="font-size: 0.86rem; color: var(--text-primary);">Urgent Pre-Deadline Reminder Email</strong>
+                  <div style="font-size: 0.76rem; color: var(--text-muted);">Dispatched 2 hours before cutoff for at-risk deliverables.</div>
+                </div>
+                <input type="checkbox" checked style="accent-color: var(--color-primary); cursor: pointer; transform: scale(1.2);">
+              </div>
+
+              <div class="schedule-rule-box">
+                <div>
+                  <strong style="font-size: 0.86rem; color: var(--text-primary);">Instant Deliverable Assignment Email</strong>
+                  <div style="font-size: 0.76rem; color: var(--text-muted);">Dispatched immediately when an action item is approved for an employee.</div>
+                </div>
+                <input type="checkbox" checked style="accent-color: var(--color-primary); cursor: pointer; transform: scale(1.2);">
+              </div>
+            </div>
+          </div>
+
+          <!-- Incoming Emails Stream for Current User -->
+          <div class="content-card">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+              <h3 class="content-card-title" style="margin-bottom: 0;">Employee Email Inbox</h3>
+              <button id="markAllEmailsReadBtn" class="btn btn-secondary btn-sm">
+                Mark All as Read
+              </button>
+            </div>
+
+            <div id="emailNotificationFeedContainer">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================================
+           VIEW 6: TEAM & EMPLOYEES (#view-analytics)
            ====================================================================== -->
       <section id="view-analytics" class="view-pane">
         <div class="view-content-wrapper">
           
-          <!-- Prominent Dedicated Employee Creator Card -->
-          <div class="employee-creator-card">
+          <!-- Prominent Dedicated Employee Creator Card (ADMIN ONLY) -->
+          <div id="adminOnlyEmployeeCreatorCard" class="employee-creator-card admin-only-element">
             <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
               <div>
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
-                  <span class="badge badge-primary" style="font-size: 0.75rem;">ADMINISTRATOR TOOL</span>
+                  <span class="badge badge-primary" style="font-size: 0.75rem;">ADMINISTRATOR ACCESS</span>
                   <h3 style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 800; color: var(--text-primary);">
                     Create Employee Account with Password
                   </h3>
@@ -481,7 +561,7 @@
                 </p>
               </div>
 
-              <button id="openAddMemberBtn" class="btn btn-primary" style="padding: 0.65rem 1.25rem; font-weight: 700;">
+              <button id="openAddMemberBtn" class="btn btn-primary admin-only-element" style="padding: 0.65rem 1.25rem; font-weight: 700;">
                 + Create Employee Account
               </button>
             </div>
@@ -510,6 +590,14 @@
             </form>
           </div>
 
+          <!-- Employee Notice Banner for Non-Admins -->
+          <div id="employeeViewNoticeBanner" style="display: none; padding: 1rem 1.25rem; background: var(--bg-subtle); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); margin-bottom: 1.5rem;">
+            <div style="font-weight: 700; color: var(--text-primary); font-size: 0.9rem;">Team Directory (Employee View)</div>
+            <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 2px;">
+              You have member access. Only Administrators can create new accounts or modify team member credentials.
+            </div>
+          </div>
+
           <!-- Employee Roster Grid -->
           <div class="content-card" style="margin-bottom: 1.5rem;">
             <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
@@ -517,7 +605,7 @@
               <span style="font-size: 0.78rem; color: var(--color-primary); font-weight: 700; font-family: var(--font-mono);" id="rosterCountBadge">1 Account Registered</span>
             </div>
             <p style="font-size: 0.825rem; color: var(--text-secondary); margin-bottom: 1rem;">
-              All registered employees can sign in using their registered Email ID and Password.
+              All registered employees sign in using their registered Email ID and Password.
             </p>
             <div class="team-members-grid" id="teamMembersGrid">
               <!-- Rendered dynamically -->
@@ -545,7 +633,7 @@
       </section>
 
       <!-- ======================================================================
-           VIEW 6: AUDIT & TRACEABILITY (#view-history)
+           VIEW 7: AUDIT & TRACEABILITY (#view-history)
            ====================================================================== -->
       <section id="view-history" class="view-pane">
         <div class="view-content-wrapper">
@@ -583,7 +671,7 @@
       </section>
 
       <!-- ======================================================================
-           VIEW 7: PLANS & ROI CALCULATOR (INR PRICING) (#view-pricing)
+           VIEW 8: PLANS & ROI CALCULATOR (INR PRICING) (#view-pricing)
            ====================================================================== -->
       <section id="view-pricing" class="view-pane">
         <div class="view-content-wrapper">

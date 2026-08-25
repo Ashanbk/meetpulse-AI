@@ -1,4 +1,4 @@
-/* styles.css - Meetpulse AI Master Design System (Dark: Black & Green | Light: White & Blue | Mobile Responsive | Emoji-Free) */
+/* styles.css - Meetpulse AI Master Design System (Dark: Black & Green | Light: White & Blue | Mobile Responsive | Role-Based & Email Scheduling) */
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap');
 
 :root {
@@ -542,6 +542,37 @@ body {
   height: 20px;
 }
 
+/* Password input wrapper */
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-input-wrapper .form-input {
+  width: 100%;
+  padding-right: 2.75rem;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 0.65rem;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: var(--radius-xs);
+  transition: color var(--transition-fast);
+}
+
+.password-toggle-btn:hover {
+  color: var(--text-primary);
+}
+
 /* ==========================================================================
    MAIN VIEWPORT & CHAT STAGE
    ========================================================================== */
@@ -695,6 +726,38 @@ body {
   align-items: center;
   gap: 0.55rem;
   flex-shrink: 0;
+}
+
+/* Notification Bell Chip */
+.notification-bell-btn {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-xs);
+  padding: 0.45rem 0.65rem;
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 700;
+  transition: all var(--transition-fast);
+}
+
+.notification-bell-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.notification-badge-unread {
+  background: var(--color-danger);
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: var(--radius-full);
 }
 
 /* Chat Messages Stream Area */
@@ -878,16 +941,6 @@ body {
   border: 1px solid var(--border-glow);
   border-radius: 4px 18px 18px 18px;
   box-shadow: var(--shadow-md), 0 0 15px var(--color-primary-light);
-}
-
-/* Highlighted commitments */
-.chat-promise-highlight {
-  background: var(--color-primary-light);
-  border-bottom: 2px solid var(--color-primary);
-  padding: 1px 4px;
-  border-radius: 3px;
-  font-weight: 700;
-  color: var(--color-primary);
 }
 
 /* In-Chat Commitment Cards Deck */
@@ -1598,36 +1651,6 @@ body {
   border: 1px solid rgba(239, 68, 68, 0.4);
 }
 
-.password-input-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.password-input-wrapper .form-input {
-  width: 100%;
-  padding-right: 2.75rem;
-}
-
-.password-toggle-btn {
-  position: absolute;
-  right: 0.65rem;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px;
-  border-radius: var(--radius-xs);
-  transition: color var(--transition-fast);
-}
-
-.password-toggle-btn:hover {
-  color: var(--text-primary);
-}
-
 /* Forms */
 .form-group {
   display: flex;
@@ -1742,6 +1765,64 @@ body {
   padding: 1.5rem 1.75rem;
   box-shadow: var(--shadow-md), var(--shadow-card-inner);
   margin-bottom: 1.5rem;
+}
+
+/* ==========================================================================
+   SCHEDULED EMAIL & NOTIFICATION FEED
+   ========================================================================== */
+.notification-feed-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: all var(--transition-fast);
+  margin-bottom: 0.85rem;
+}
+
+.notification-feed-card:hover {
+  border-color: var(--border-glow);
+  box-shadow: var(--shadow-md);
+}
+
+.notification-feed-card.unread {
+  border-left: 4px solid var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.email-meta-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.email-subject-line {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.email-body-snippet {
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* Schedule Rules Card */
+.schedule-rule-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.65rem;
 }
 
 /* Pricing Grid */
