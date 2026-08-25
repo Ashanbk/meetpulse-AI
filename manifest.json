@@ -1,12 +1,10 @@
 {
-  "id": "meetpulse-ai-pwa",
   "name": "Meetpulse — AI Meeting & Commitment Intelligence",
   "short_name": "Meetpulse",
-  "description": "Intelligent meeting listener that extracts deliverables and commitments.",
-  "start_url": "./",
+  "description": "Intelligent meeting listener and commitment tracking platform.",
+  "start_url": "index.html",
   "scope": "./",
   "display": "standalone",
-  "display_override": ["standalone", "window-controls-overlay", "minimal-ui"],
   "orientation": "portrait-primary",
   "background_color": "#000000",
   "theme_color": "#10b981",
@@ -15,25 +13,13 @@
       "src": "icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     },
     {
       "src": "icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     },
     {
       "src": "icons/icon.svg",
@@ -42,6 +28,5 @@
       "purpose": "any"
     }
   ],
-  "categories": ["productivity", "business", "utilities"],
-  "prefer_related_applications": false
+  "categories": ["productivity", "business", "utilities"]
 }

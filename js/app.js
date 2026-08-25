@@ -56,16 +56,21 @@ class MeetPulseApp {
   }
 
   initPwa() {
-    // Register Service Worker for offline capability & PWA
+    // Register Service Worker immediately for PWA installability
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js').then((reg) => {
+      const registerSW = () => {
+        navigator.serviceWorker.register('sw.js', { scope: './' }).then((reg) => {
           console.log('Meetpulse PWA Service Worker Registered:', reg.scope);
         }).catch((err) => {
-          // Fallback to relative path
-          navigator.serviceWorker.register('./sw.js').catch(() => {});
+          navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {});
         });
-      });
+      };
+
+      if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        registerSW();
+      } else {
+        window.addEventListener('DOMContentLoaded', registerSW);
+      }
     }
 
     // Always keep install buttons visible
@@ -79,10 +84,19 @@ class MeetPulseApp {
       e.preventDefault();
       this.deferredPrompt = e;
       console.log('Native PWA install prompt ready.');
+
+      const directBtn = document.getElementById('directPwaInstallBtn');
+      if (directBtn) {
+        directBtn.innerHTML = `
+          <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <span>Click to Install Meetpulse Now (Native 1-Click)</span>
+        `;
+      }
     });
 
     window.addEventListener('appinstalled', () => {
       this.deferredPrompt = null;
+      this.closeInstallAppModal();
       this.showToast('Meetpulse is running as an installed standalone web app!');
     });
   }
@@ -95,6 +109,7 @@ class MeetPulseApp {
           this.showToast('Meetpulse Web App installed successfully!');
         }
         this.deferredPrompt = null;
+        this.closeInstallAppModal();
       });
     } else {
       this.openInstallAppModal();
