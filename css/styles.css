@@ -1894,8 +1894,7 @@ body.is-employee #adminOnlyEmployeeCreatorCard,
 body.is-employee #openAddMemberBtn,
 body.is-employee #addMemberModal,
 body.is-employee #notificationScheduleConfigCard,
-body.is-employee #broadcastDigestEmailBtn,
-body.is-employee .btn-delete-employee {
+body.is-employee #broadcastDigestEmailBtn {
   display: none !important;
   visibility: hidden !important;
   pointer-events: none !important;

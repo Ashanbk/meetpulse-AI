@@ -199,13 +199,22 @@ class MeetPulseApp {
     let html = '';
     employees.forEach(emp => {
       html += `
-        <div class="team-member-card" style="padding: 0.45rem 0.65rem; cursor: pointer; background: var(--bg-card);" onclick="window.commitPulseApp.fillCredentials('${emp.email}', '${emp.password || 'employee123'}')">
-          <span class="avatar-initials avatar-sm">${emp.avatar}</span>
-          <div style="flex: 1; overflow: hidden;">
-            <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary);">${emp.name}</div>
-            <div style="font-size: 0.72rem; color: var(--text-secondary); font-family: var(--font-mono);">${emp.email} • ${emp.password || 'employee123'}</div>
+        <div class="team-member-card" style="padding: 0.45rem 0.65rem; background: var(--bg-card); display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1; cursor: pointer; overflow: hidden;" onclick="window.commitPulseApp.fillCredentials('${emp.email}', '${emp.password || 'employee123'}')">
+            <span class="avatar-initials avatar-sm">${emp.avatar}</span>
+            <div style="flex: 1; overflow: hidden;">
+              <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary);">${emp.name}</div>
+              <div style="font-size: 0.72rem; color: var(--text-secondary); font-family: var(--font-mono);">${emp.email} • ${emp.password || 'employee123'}</div>
+            </div>
           </div>
-          <span style="font-size: 0.7rem; color: var(--color-primary); font-weight: 700;">Fill →</span>
+          <div style="display: flex; align-items: center; gap: 0.35rem;">
+            <button class="btn btn-secondary btn-sm" style="padding: 2px 6px; font-size: 0.68rem;" onclick="window.commitPulseApp.fillCredentials('${emp.email}', '${emp.password || 'employee123'}')">
+              Fill
+            </button>
+            <button class="btn btn-danger btn-sm" style="padding: 2px 6px; font-size: 0.68rem;" onclick="event.stopPropagation(); window.commitPulseApp.deleteEmployee('${emp.id}')" title="Delete Employee">
+              Delete
+            </button>
+          </div>
         </div>
       `;
     });
@@ -1362,8 +1371,6 @@ class MeetPulseApp {
     const grid = document.getElementById('teamMembersGrid');
     if (!grid) return;
 
-    const isAdmin = this.currentUser && (this.currentUser.isAdmin || this.currentUser.role === 'Administrator');
-
     grid.innerHTML = this.registeredUsers.map(m => `
       <div class="team-member-card">
         <div class="avatar-initials" style="width: 38px; height: 38px; font-size: 0.85rem;">${m.avatar || 'ST'}</div>
@@ -1377,26 +1384,21 @@ class MeetPulseApp {
         </div>
         <div style="display: flex; align-items: center; gap: 0.35rem;">
           ${!m.isAdmin ? `
-            <button class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 0.7rem;" onclick="window.commitPulseApp.fillCredentials('${m.email}', '${m.password || 'employee123'}')" title="Autofill Login Credentials">
+            <button class="btn btn-secondary btn-sm" style="padding: 3px 8px; font-size: 0.72rem;" onclick="window.commitPulseApp.fillCredentials('${m.email}', '${m.password || 'employee123'}')" title="Autofill Login Credentials">
               Autofill
             </button>
-          ` : ''}
-          ${(isAdmin && !m.isAdmin) ? `
-            <button class="btn btn-danger btn-sm" style="padding: 2px 7px; font-size: 0.7rem;" onclick="window.commitPulseApp.deleteEmployee('${m.id}')" title="Delete Employee Account">
+            <button class="btn btn-danger btn-sm" style="padding: 3px 8px; font-size: 0.72rem; font-weight: 700;" onclick="window.commitPulseApp.deleteEmployee('${m.id}')" title="Delete Employee Account">
               Delete
             </button>
-          ` : ''}
+          ` : `
+            <span style="font-size: 0.7rem; color: var(--color-primary); font-family: var(--font-mono); font-weight: 700;">Root Admin</span>
+          `}
         </div>
       </div>
     `).join('');
   }
 
   deleteEmployee(userId) {
-    if (this.currentUser && !this.currentUser.isAdmin && this.currentUser.role !== 'Administrator') {
-      this.showToast('Administrator privileges required to delete employee accounts.');
-      return;
-    }
-
     const userToDelete = this.registeredUsers.find(u => u.id === userId);
     if (!userToDelete) return;
 
@@ -1409,9 +1411,10 @@ class MeetPulseApp {
     this.saveUsers();
     this.populateTeamDropdowns();
     this.renderTeamMembers();
+    this.renderRegisteredAccountsDeck();
     this.renderAnalytics();
     this.updateDashboardKPIs();
-    this.showToast(`Deleted employee account for ${userToDelete.name} (${userToDelete.email})`);
+    this.showToast(`Deleted employee account: ${userToDelete.name} (${userToDelete.email})`);
   }
 
   renderAuditHistory() {
