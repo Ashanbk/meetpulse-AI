@@ -1,46 +1,35 @@
-# ⚡ CommitPulse AI — "AI That Finds the Work Hiding Inside Your Conversations"
+# Meetpulse AI — Meeting & Communication Commitment Intelligence
 
-> **An AI-powered platform that detects hidden work commitments inside everyday company communication—emails, chats, and meeting transcripts—and converts confirmed commitments into trackable tasks before they get forgotten.**
-
----
-
-## 🎯 The Problem
-
-Employees constantly make informal promises in daily communications:
-- *“I’ll send the report tomorrow.”*
-- *“Can you check with the supplier?”*
-- *“Please update this by Friday.”*
-
-Many of these commitments never become formal tasks in Jira, Linear, or Trello, and are therefore **forgotten, delayed, or lost** inside Slack channels, email chains, and call recordings.
+> **Never drop a promise again.** Meetpulse listens to team meetings, client calls, emails, and chat discussions to automatically detect commitments, assign owners, extract deadlines, and track deliverables to completion.
 
 ---
 
-## 💡 The Solution & Core Value
+## ⚡ Core Value Proposition
 
-**CommitPulse AI** acts as an intelligent commitment-detection layer that:
-1. **Listens & Scans**: Ingests everyday communication from Slack, Microsoft Teams, Gmail, Outlook, and Zoom transcripts.
-2. **Extracts with NLP**: Automatically extracts the **Task / Action**, **Person Responsible (Owner)**, **Target Deadline**, **Priority**, and **AI Confidence Score (e.g. 96%)**.
-3. **Human Confirmation (AI Inbox)**: Puts the employee in the driver's seat (`Create Task` / `Edit` / `Delegate` / `Ignore`). Only confirmed commitments enter the task tracking system.
-4. **Progress & Forgotten-Work Radar**: Tracks deadlines and proactively warns when a commitment is at risk of being delayed or forgotten (*"🟠 Sales report was due today at 5:00 PM"*).
+Modern teams discuss dozens of commitments across Zoom calls, Google Meet sessions, client emails, and Slack channels every day. Over 40% of conversational action items get forgotten without being entered into formal project management tools.
 
----
-
-## 🚀 Key Modules & Pages
-
-- 📊 **Dashboard**: High-level KPIs, Forgotten-Work Radar banner, and live communication listener/simulator.
-- 📥 **AI Inbox (The Core Innovation)**: Pending detected commitments awaiting human confirmation with confidence badges and exact quote snippets.
-- 📋 **My Tasks (Kanban & List)**: Confirmed commitments tracked on an interactive Kanban board (*To Do*, *In Progress*, *Waiting*, *Done*) with instant Slack Reminder Nudges.
-- 📜 **Commitment History & Audit Trail**: Full traceability connecting every task back to the original message/email and conversion timeline.
-- 📈 **Team Analytics**: Team reliability index and commitment-to-task conversion rate.
-- 💎 **SaaS Pricing & ROI Calculator**: Free (₹0), Pro (₹299/user/mo), Team (₹599/user/mo), and Enterprise tiers, plus interactive ROI calculator.
+**Meetpulse AI solves this by acting as a passive commitment listener:**
+1. **Real-time Detection**: Extracts promises, deadlines, and assigned owners from meeting audio transcripts, client emails, and Slack streams.
+2. **Human-in-the-Loop Review**: Surfaces detected commitments in an Action Item Queue for 1-click confirmation or editing.
+3. **Interactive Deliverables Board**: Automatically converts approved commitments into Kanban tasks (*To Do*, *In Progress*, *In Review*, *Completed*).
+4. **Milestone Risk Radar**: Proactively alerts teams to approaching deadlines and overdue commitments with automated reminder nudges.
+5. **Team Reliability Metrics**: Quantifies follow-through rates and delivery punctuality.
 
 ---
 
-## 🏁 Quickstart Guide
+## 🛠️ Architecture & Tech Stack
 
-### 1. Launch the Server
+- **Frontend**: Vanilla JavaScript (ES6 Modules), HTML5 Semantic Structure, Custom CSS3 Design System with Pitch Black (OLED) Luxury Aesthetics and zero emojis.
+- **Charts & Visualizations**: Chart.js 4.4.0 for real-time conversion and punctuality metrics.
+- **AI & NLP Engine**: Built-in high-speed rule-based heuristic extraction engine + optional Google Gemini 1.5 Flash API integration.
+- **Server**: Lightweight Python HTTP server (`server.py`) and Vercel serverless functions (`api/analyze.js`).
+- **Role-Based Authentication**: Dedicated sessions for **Administrator** and **Employee** with persistent state.
 
-Run the Python server in this directory:
+---
+
+## 🚀 Quickstart Guide
+
+### 1. Start the Local Server
 
 ```bash
 python server.py
@@ -49,11 +38,42 @@ python server.py
 Open your browser to:
 👉 **`http://localhost:5000`**
 
-### 2. Immediate Testing
+### 2. Sign In
 
-1. On the **Dashboard**, click **"✨ Scan & Extract Commitments to AI Inbox"**.
-2. Switch between **Slack**, **Gmail**, and **Zoom** communication presets or paste your own message.
-3. In the **AI Inbox**, review the detected commitments and click **"✅ Create Task"** or **"🔄 Delegate"**.
-4. In **My Tasks**, view your confirmed tasks on the Kanban board and test the **"🔔 Nudge"** reminder button!
-5. Check the **Pricing Plans** tab and slide the ROI calculator to see how much money your team saves by eliminating dropped balls.
-# meetpulse-AI
+- **Sign in as Administrator** (`admin@meetpulse.ai`) for full system controls.
+- **Sign in as Employee** (`alex@meetpulse.ai`) for staff deliverable tracking.
+
+### 3. Usage & Features
+
+1. **Live Meeting Stream**: Transcribe meeting audio or paste conversation logs. Click **"Scan & Extract Action Items"** to view interactive commitment cards directly in the stream.
+2. **Action Item Queue**: Review extracted deliverables with AI confidence scores and click **"Approve Deliverable"**.
+3. **Deliverables Board**: View Kanban sprint columns, drag and drop cards to update status, and trigger automated reminder nudges.
+4. **Milestone Risk Radar**: Monitor high-risk deliverables approaching cutoff dates.
+5. **Team Reliability**: Review team member reliability scores and add new members dynamically.
+6. **Plans & ROI Calculator**: Calculate monthly operational hours saved by preventing lost deliverables.
+
+---
+
+## 📦 Project Structure
+
+```
+├── api/
+│   └── analyze.js           # Vercel serverless function for AI extraction
+├── css/
+│   └── styles.css           # Pitch Black luxury dark theme design system
+├── js/
+│   ├── app.js               # Main application orchestrator & auth manager
+│   ├── commitmentEngine.js  # NLP heuristic parser & Gemini LLM caller
+│   ├── inboxManager.js      # Action item queue manager
+│   ├── mockCommsData.js     # Default accounts & starter meeting streams
+│   └── taskManager.js       # Kanban board & milestone risk engine
+├── index.html               # Main application viewport & modals
+├── server.py                # Local development HTTP server
+└── README.md                # Project documentation
+```
+
+---
+
+## 🔒 Security & Privacy
+
+Meetpulse operates with a client-side first architecture. Meeting audio and communication data can be processed entirely offline using local NLP heuristics or via secure, encrypted calls to Google Gemini.

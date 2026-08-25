@@ -1,16 +1,21 @@
-// commitmentEngine.js - Advanced NLP Commitment Detection & Entity Extractor
+// commitmentEngine.js - Meetpulse AI Meeting & Communication Commitment Extractor (Emoji-Free)
 
 export class CommitmentEngine {
   constructor() {
-    this.geminiApiKey = localStorage.getItem("commitpulse_gemini_key") || "";
+    this.geminiApiKey = localStorage.getItem("meetpulse_gemini_key") || localStorage.getItem("commitpulse_gemini_key") || "";
+    this.registeredUsers = [];
+  }
+
+  setRegisteredUsers(users) {
+    this.registeredUsers = Array.isArray(users) ? users : [];
   }
 
   setApiKey(key) {
     this.geminiApiKey = key.trim();
     if (this.geminiApiKey) {
-      localStorage.setItem("commitpulse_gemini_key", this.geminiApiKey);
+      localStorage.setItem("meetpulse_gemini_key", this.geminiApiKey);
     } else {
-      localStorage.removeItem("commitpulse_gemini_key");
+      localStorage.removeItem("meetpulse_gemini_key");
     }
   }
 
@@ -18,7 +23,6 @@ export class CommitmentEngine {
     return this.geminiApiKey;
   }
 
-  // Parse natural language deadline string into ISO date & human readable format
   parseNaturalDeadline(text) {
     const lower = text.toLowerCase();
     const now = new Date();
@@ -71,7 +75,6 @@ export class CommitmentEngine {
     };
   }
 
-  // Assess commitment confidence based on linguistic structure
   calculateConfidence(sentence, hasOwner, hasDeadline, hasActionVerb) {
     let score = 65;
     if (hasActionVerb) score += 15;
@@ -81,41 +84,34 @@ export class CommitmentEngine {
     return Math.min(99, Math.max(70, score));
   }
 
-  // Analyze communication text (Email / Slack / Meeting / Paste)
-  async analyzeCommunication({ text, sourceType = "Slack", sourceChannel = "#general", sender = "Team Member" }) {
+  async analyzeCommunication({ text, sourceType = "Meeting Transcript", sourceChannel = "General", sender = "Current User" }) {
     if (this.geminiApiKey) {
       try {
         const geminiResult = await this.callGeminiAPI({ text, sourceType, sourceChannel, sender });
         if (geminiResult && geminiResult.length > 0) return geminiResult;
       } catch (err) {
-        console.warn("Gemini API call failed, falling back to local NLP heuristics engine:", err);
+        console.warn("Gemini API call failed, falling back to local Meetpulse NLP engine:", err);
       }
     }
 
     return this.analyzeLocally({ text, sourceType, sourceChannel, sender });
   }
 
-  // Local NLP Heuristic Engine
   analyzeLocally({ text, sourceType, sourceChannel, sender }) {
     const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
     const commitments = [];
     let idCounter = Date.now();
 
-    const teamNames = [
-      { name: "Rahul Verma", alias: ["rahul", "rahul v", "@rahul"], role: "Sales Lead", avatar: "👨‍💻" },
-      { name: "Priya Patel", alias: ["priya", "priya p", "@priya"], role: "Senior UI/UX Designer", avatar: "👩‍🎨" },
-      { name: "Aarav Sharma", alias: ["aarav", "aarav s", "@aarav"], role: "Head of Product", avatar: "👨‍💼" },
-      { name: "Marcus Vance", alias: ["marcus", "marcus v", "@marcus"], role: "Backend Engineer", avatar: "👨‍🔧" },
-      { name: "Elena Rostova", alias: ["elena", "elena r", "@elena"], role: "SRE / DevOps", avatar: "👩‍🚀" },
-      { name: "Vikram Malhotra", alias: ["vikram", "vikram m", "@vikram"], role: "Cloud Architect", avatar: "👨‍🔬" },
-      { name: "David Kim", alias: ["david", "david k", "@david"], role: "Product Manager", avatar: "👔" }
+    const teamNames = this.registeredUsers.length > 0 ? this.registeredUsers : [
+      { name: "Admin User", alias: ["admin", "lead", "@admin"], role: "Administrator", avatar: "AD" },
+      { name: "Alex Taylor", alias: ["alex", "staff", "@alex"], role: "Staff Member", avatar: "AT" }
     ];
 
     const commitmentPatterns = [
       /(?:i will|i'll|i am going to|i'll take|i will take|i'm on it|i will handle)\s+([^.!?]+)/i,
       /(?:please|can you|could you|make sure to|kindly)\s+([^.!?]+)/i,
       /(?:need to|we must|has to be|scheduled to)\s+([^.!?]+)/i,
-      /(?:update|send|deliver|check with|provide|draft|configure|review|finish|complete|verify)\s+([^.!?]+)/i
+      /(?:update|send|deliver|check with|provide|draft|configure|review|finish|complete|verify|compile|post|upload|publish)\s+([^.!?]+)/i
     ];
 
     const noisePatterns = [
@@ -126,14 +122,12 @@ export class CommitmentEngine {
       let speaker = sender;
       let lineText = rawLine;
 
-      // Check speaker prefix "Aarav: ..." or "From: ..."
       const speakerMatch = rawLine.match(/^([A-Za-z\s.-]+?):\s*(.+)$/);
       if (speakerMatch) {
         speaker = speakerMatch[1].trim();
         lineText = speakerMatch[2].trim();
       }
 
-      // Check if pure noise
       let isNoise = false;
       for (const np of noisePatterns) {
         if (np.test(lineText)) {
@@ -143,7 +137,6 @@ export class CommitmentEngine {
       }
       if (isNoise) continue;
 
-      // Check for commitment match
       let isCommitment = false;
       for (const cp of commitmentPatterns) {
         if (cp.test(lineText)) {
@@ -153,21 +146,19 @@ export class CommitmentEngine {
       }
 
       if (isCommitment || lineText.toLowerCase().includes("by ") || lineText.toLowerCase().includes("tomorrow") || lineText.toLowerCase().includes("friday")) {
-        // Detect owner
-        let matchedOwner = teamNames.find(t => lineText.toLowerCase().includes(t.name.toLowerCase()) || t.alias.some(a => lineText.toLowerCase().includes(a)));
+        let matchedOwner = teamNames.find(t => lineText.toLowerCase().includes(t.name.toLowerCase()) || (t.alias && t.alias.some(a => lineText.toLowerCase().includes(a))));
         
-        // If first-person promise ("I will..."), speaker is the owner
         if (lineText.match(/^(i will|i'll|i am|i'm on it)/i)) {
-          matchedOwner = teamNames.find(t => speaker.toLowerCase().includes(t.name.toLowerCase()) || t.alias.some(a => speaker.toLowerCase().includes(a))) || {
+          matchedOwner = teamNames.find(t => speaker.toLowerCase().includes(t.name.toLowerCase()) || (t.alias && t.alias.some(a => speaker.toLowerCase().includes(a)))) || {
             name: speaker,
-            role: "Team Member",
-            avatar: "👤"
+            role: "Staff Member",
+            avatar: speaker.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) || "ST"
           };
         } else if (!matchedOwner) {
           matchedOwner = {
-            name: speaker !== sender ? speaker : "Assignee Needed",
-            role: "Team Member",
-            avatar: "👤"
+            name: speaker !== sender ? speaker : sender,
+            role: "Staff Member",
+            avatar: (speaker || sender).split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) || "ST"
           };
         }
 
@@ -175,20 +166,19 @@ export class CommitmentEngine {
         const priority = lineText.match(/(urgent|asap|critical|immediately|today)/i) ? "Urgent"
                        : lineText.match(/(high|important|blocker|eod)/i) ? "High" : "Medium";
 
-        // Clean action task title
-        let actionTitle = lineText.replace(/^(rahul,|priya,|aarav,|marcus,|elena,|david,|alex,|hey team,|team,)/i, "").trim();
+        let actionTitle = lineText.replace(/^(alex,|admin,|staff,|team,|leads,)/i, "").trim();
         actionTitle = actionTitle.replace(/^(please|can you|could you|i will|i'll|kindly)\s+/i, "").trim();
         actionTitle = actionTitle.charAt(0).toUpperCase() + actionTitle.slice(1);
         if (actionTitle.length > 75) actionTitle = actionTitle.substring(0, 72) + "...";
 
-        const confidence = this.calculateConfidence(lineText, matchedOwner.name !== "Assignee Needed", true, true);
+        const confidence = this.calculateConfidence(lineText, true, true, true);
 
         commitments.push({
           id: `com-${idCounter++}`,
           taskTitle: actionTitle,
           owner: matchedOwner.name,
-          ownerAvatar: matchedOwner.avatar,
-          ownerRole: matchedOwner.role,
+          ownerAvatar: matchedOwner.avatar || "ST",
+          ownerRole: matchedOwner.role || "Staff Member",
           requester: speaker !== matchedOwner.name ? speaker : "Self-committed",
           deadline: deadlineInfo.label,
           deadlineISO: deadlineInfo.iso,
@@ -203,17 +193,16 @@ export class CommitmentEngine {
       }
     }
 
-    // Fallback if none matched
     if (commitments.length === 0 && lines.length > 0) {
       const sampleLine = lines[0];
       const deadlineInfo = this.parseNaturalDeadline(sampleLine);
       commitments.push({
         id: `com-${idCounter++}`,
         taskTitle: sampleLine.length > 70 ? sampleLine.substring(0, 67) + "..." : sampleLine,
-        owner: sender || "Rahul Verma",
-        ownerAvatar: "👨‍💻",
-        ownerRole: "Team Member",
-        requester: sender || "Team Member",
+        owner: sender || "Alex Taylor",
+        ownerAvatar: sender ? sender.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : "AT",
+        ownerRole: "Staff Member",
+        requester: sender || "Lead",
         deadline: deadlineInfo.label,
         deadlineISO: deadlineInfo.iso,
         priority: "Medium",
@@ -229,16 +218,14 @@ export class CommitmentEngine {
     return commitments;
   }
 
-  // Call Gemini REST API if configured
   async callGeminiAPI({ text, sourceType, sourceChannel, sender }) {
-    const prompt = `You are CommitPulse AI, a hidden work commitment detector.
-Extract all work commitments from this text.
-Text:
+    const prompt = `You are Meetpulse AI, an intelligent meeting commitment and deliverable extractor.
+Extract all action items, promises, and deliverables from this text:
 ${text}
 
 Return a JSON array of objects with:
 - "taskTitle": concise action item
-- "owner": person responsible (e.g. Rahul Verma)
+- "owner": person responsible
 - "requester": who requested it
 - "deadline": human readable deadline (e.g. Friday, 5:00 PM)
 - "priority": Urgent, High, Medium, or Low
@@ -267,8 +254,8 @@ Return strictly JSON format without markdown code fences.`;
         id: `com-${idCounter++}`,
         taskTitle: item.taskTitle,
         owner: item.owner || sender,
-        ownerAvatar: "👤",
-        ownerRole: "Team Member",
+        ownerAvatar: (item.owner || sender).split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) || "ST",
+        ownerRole: "Staff Member",
         requester: item.requester || sender,
         deadline: item.deadline || "Friday, 5:00 PM",
         deadlineISO: new Date(Date.now() + 3 * 86400000).toISOString(),

@@ -1,66 +1,226 @@
-// app.js - Main Application Orchestrator for CommitPulse AI
-import { PRELOADED_COMMS, INITIAL_CONFIRMED_TASKS, TEAM_MEMBERS } from './mockCommsData.js';
+// app.js - Meetpulse Master Application Orchestrator (Password-Protected Auth | INR Pricing | Mobile Responsive)
+import { DEFAULT_USERS, PRELOADED_COMMS, INITIAL_CONFIRMED_TASKS } from './mockCommsData.js';
 import { CommitmentEngine } from './commitmentEngine.js';
 import { InboxManager } from './inboxManager.js';
 import { TaskManager } from './taskManager.js';
 
-class CommitPulseApp {
+class MeetPulseApp {
   constructor() {
+    this.currentUser = null;
+    this.registeredUsers = [];
+    this.communicationStreams = [];
     this.commitmentEngine = new CommitmentEngine();
     this.inboxManager = null;
     this.taskManager = null;
-    this.teamMembers = [...TEAM_MEMBERS];
 
     this.activeChannelIndex = 0;
+    this.activeViewId = 'view-chat';
     this.charts = { conversion: null, reliability: null };
-    this.draggedTaskId = null;
+    this.inchatCommitmentsMap = new Map();
 
     this.init();
   }
 
   init() {
+    this.initUsers();
     this.initInbox();
     this.initTaskManager();
     this.bindEvents();
-    this.loadChannelPreview(PRELOADED_COMMS[0]);
+    this.loadChannel(0);
+    this.setupRoiCalculator();
+
+    window.commitPulseApp = this;
+
+    // Check stored session
+    const storedSession = localStorage.getItem('meetpulse_session');
+    if (storedSession) {
+      try {
+        const user = JSON.parse(storedSession);
+        const valid = this.registeredUsers.find(u => u.email.toLowerCase() === user.email.toLowerCase());
+        if (valid) {
+          this.setCurrentUser(valid);
+          this.closeAuthOverlay();
+        } else {
+          this.openAuthOverlay();
+        }
+      } catch (e) {
+        this.openAuthOverlay();
+      }
+    } else {
+      this.openAuthOverlay();
+    }
+  }
+
+  initUsers() {
+    const storedUsers = localStorage.getItem('meetpulse_users_db');
+    if (storedUsers) {
+      try {
+        this.registeredUsers = JSON.parse(storedUsers);
+        // Ensure all existing users have a password
+        this.registeredUsers.forEach(u => {
+          if (!u.password) u.password = u.isAdmin ? 'admin123' : 'employee123';
+        });
+      } catch (e) {
+        this.registeredUsers = [...DEFAULT_USERS];
+      }
+    } else {
+      this.registeredUsers = [...DEFAULT_USERS];
+      this.saveUsers();
+    }
+
+    this.commitmentEngine.setRegisteredUsers(this.registeredUsers);
+  }
+
+  saveUsers() {
+    localStorage.setItem('meetpulse_users_db', JSON.stringify(this.registeredUsers));
+    this.commitmentEngine.setRegisteredUsers(this.registeredUsers);
+    this.renderRegisteredAccountsDeck();
+    this.renderTeamMembers();
+  }
+
+  setCurrentUser(user) {
+    this.currentUser = user;
+    localStorage.setItem('meetpulse_session', JSON.stringify(user));
+
+    const avatarEl = document.getElementById('sidebarUserAvatar');
+    const nameEl = document.getElementById('sidebarUserName');
+    const roleEl = document.getElementById('sidebarUserRole');
+    const roleBadgeEl = document.getElementById('sidebarUserRoleBadge');
+
+    if (avatarEl) avatarEl.textContent = user.avatar || user.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+    if (nameEl) nameEl.textContent = user.name;
+    if (roleEl) roleEl.textContent = user.role;
+    if (roleBadgeEl) {
+      if (user.isAdmin || user.role === 'Administrator') {
+        roleBadgeEl.textContent = 'ADMIN';
+        roleBadgeEl.style.background = 'var(--color-primary-light)';
+        roleBadgeEl.style.color = 'var(--color-primary)';
+      } else {
+        roleBadgeEl.textContent = 'EMPLOYEE';
+        roleBadgeEl.style.background = 'var(--color-accent-light)';
+        roleBadgeEl.style.color = 'var(--color-accent)';
+      }
+    }
+
     this.populateTeamDropdowns();
     this.renderTeamMembers();
     this.updateDashboardKPIs();
-    this.setupRoiCalculator();
+    this.renderAnalytics();
+  }
 
-    // Attach to global window for inline HTML handlers
-    window.commitPulseApp = this;
+  openAuthOverlay() {
+    document.getElementById('authOverlay')?.classList.add('active');
+    this.renderRegisteredAccountsDeck();
+  }
+
+  closeAuthOverlay() {
+    document.getElementById('authOverlay')?.classList.remove('active');
+    const err = document.getElementById('loginErrorMessage');
+    if (err) err.style.display = 'none';
+  }
+
+  renderRegisteredAccountsDeck() {
+    const list = document.getElementById('employeePresetsList');
+    if (!list) return;
+
+    const employees = this.registeredUsers.filter(u => !u.isAdmin && u.role !== 'Administrator');
+    if (employees.length === 0) {
+      list.innerHTML = `
+        <div style="font-size: 0.74rem; color: var(--text-muted); padding: 0.25rem 0;">
+          No employee accounts created yet.
+        </div>
+      `;
+      return;
+    }
+
+    let html = '';
+    employees.forEach(emp => {
+      html += `
+        <div class="team-member-card" style="padding: 0.45rem 0.65rem; cursor: pointer; background: var(--bg-card);" onclick="window.commitPulseApp.fillCredentials('${emp.email}', '${emp.password || 'employee123'}')">
+          <span class="avatar-initials avatar-sm">${emp.avatar}</span>
+          <div style="flex: 1; overflow: hidden;">
+            <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary);">${emp.name}</div>
+            <div style="font-size: 0.72rem; color: var(--text-secondary); font-family: var(--font-mono);">${emp.email} • ${emp.password || 'employee123'}</div>
+          </div>
+          <span style="font-size: 0.7rem; color: var(--color-primary); font-weight: 700;">Fill →</span>
+        </div>
+      `;
+    });
+
+    list.innerHTML = html;
+  }
+
+  fillCredentials(email, password) {
+    const emailInput = document.getElementById('loginEmailInput');
+    const passInput = document.getElementById('loginPasswordInput');
+    if (emailInput) emailInput.value = email;
+    if (passInput) passInput.value = password;
+    this.showToast(`Autofilled credentials for ${email}`);
+  }
+
+  loginWithCredentials(email, password) {
+    const trimmedEmail = (email || '').trim().toLowerCase();
+    const trimmedPass = (password || '').trim();
+
+    const user = this.registeredUsers.find(u => u.email.toLowerCase() === trimmedEmail);
+    const err = document.getElementById('loginErrorMessage');
+
+    if (!user) {
+      if (err) {
+        err.textContent = `No account found for "${email}". Please verify your email or sign in as Administrator to create this employee.`;
+        err.style.display = 'block';
+      }
+      return;
+    }
+
+    if (user.password !== trimmedPass) {
+      if (err) {
+        err.textContent = `Incorrect password for ${email}. Please check and try again.`;
+        err.style.display = 'block';
+      }
+      return;
+    }
+
+    // Success
+    this.setCurrentUser(user);
+    this.closeAuthOverlay();
+    this.showToast(`Signed in successfully as ${user.name} (${user.role})`);
+  }
+
+  logout() {
+    localStorage.removeItem('meetpulse_session');
+    this.currentUser = null;
+    this.openAuthOverlay();
+    this.showToast('Signed out of workspace');
   }
 
   initInbox() {
-    const initialCommitments = [];
-    PRELOADED_COMMS.forEach(c => {
-      if (c.detectedCommitments) {
-        initialCommitments.push(...c.detectedCommitments);
-      }
-    });
-
     this.inboxManager = new InboxManager('inboxContainer', {
       onTaskConfirmed: (task) => {
         this.taskManager.addTask(task);
         this.updateDashboardKPIs();
         this.renderAuditHistory();
         this.renderAnalytics();
-        this.showToast(`✅ Created Task [${task.id}] for @${task.owner}!`);
+        this.renderRadarRisks();
+        this.updateInChatCardStatus(task.id, 'confirmed', task.id);
+        this.showToast(`Approved Deliverable [${task.id}] for ${task.owner}`);
       },
       onCommitmentDismissed: (item) => {
         this.updateDashboardKPIs();
         this.renderAuditHistory();
         this.renderAnalytics();
-        this.showToast(`❌ Dismissed commitment: "${item.taskTitle.substring(0, 30)}..."`);
+        this.renderRadarRisks();
+        this.updateInChatCardStatus(item.id, 'dismissed');
+        this.showToast(`Dismissed commitment: "${item.taskTitle.substring(0, 30)}..."`);
       },
       onInboxUpdated: (stats) => {
         this.updateDashboardKPIs();
         this.renderAnalytics();
+        this.renderRadarRisks();
       }
     });
 
-    this.inboxManager.setCommitments(initialCommitments);
+    this.inboxManager.setCommitments([]);
   }
 
   initTaskManager() {
@@ -68,34 +228,96 @@ class CommitPulseApp {
       this.updateDashboardKPIs();
       this.renderAuditHistory();
       this.renderAnalytics();
+      this.renderRadarRisks();
     });
 
-    this.taskManager.setTasks(INITIAL_CONFIRMED_TASKS);
+    this.taskManager.setTasks([]);
     this.renderAuditHistory();
   }
 
   bindEvents() {
-    // Tab Navigation
-    document.querySelectorAll('.nav-tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.nav-tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    // Password-Protected Sign In Form
+    document.getElementById('secureLoginForm')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const email = document.getElementById('loginEmailInput')?.value;
+      const password = document.getElementById('loginPasswordInput')?.value;
+      this.loginWithCredentials(email, password);
+    });
 
-        btn.classList.add('active');
-        const tabId = btn.getAttribute('data-tab');
-        const pane = document.getElementById(tabId);
-        if (pane) pane.classList.add('active');
+    // Password Visibility Toggle
+    const togglePassBtn = document.getElementById('toggleLoginPasswordBtn');
+    const passInput = document.getElementById('loginPasswordInput');
+    if (togglePassBtn && passInput) {
+      togglePassBtn.addEventListener('click', () => {
+        const isPassword = passInput.getAttribute('type') === 'password';
+        passInput.setAttribute('type', isPassword ? 'text' : 'password');
+        togglePassBtn.style.color = isPassword ? 'var(--color-primary)' : 'var(--text-muted)';
+      });
+    }
 
-        if (tabId === 'tab-analytics') {
-          setTimeout(() => this.renderAnalytics(), 80);
-        }
-        if (tabId === 'tab-history') {
-          this.renderAuditHistory();
-        }
+    // 1-Click Fast Admin Sign In Fill
+    document.getElementById('quickLoginAdminBtn')?.addEventListener('click', () => {
+      this.fillCredentials('admin@meetpulse.ai', 'admin123');
+      this.loginWithCredentials('admin@meetpulse.ai', 'admin123');
+    });
+    
+    // Quick create employee from login screen
+    document.getElementById('quickCreateEmpFromLoginBtn')?.addEventListener('click', () => {
+      this.fillCredentials('admin@meetpulse.ai', 'admin123');
+      this.loginWithCredentials('admin@meetpulse.ai', 'admin123');
+      this.switchView('view-analytics');
+      this.openAddMemberModal();
+    });
+
+    // Switch User / Logout
+    document.getElementById('switchUserBtn')?.addEventListener('click', () => this.logout());
+    document.getElementById('userProfileTrigger')?.addEventListener('click', () => this.logout());
+
+    // Mobile Sidebar Drawer & Backdrop
+    const mobileToggle = document.getElementById('mobileSidebarToggle');
+    const sidebar = document.getElementById('appSidebar');
+    const backdrop = document.getElementById('sidebarBackdrop');
+
+    const openSidebar = () => {
+      sidebar?.classList.add('sidebar-open');
+      backdrop?.classList.add('active');
+    };
+
+    const closeSidebar = () => {
+      sidebar?.classList.remove('sidebar-open');
+      backdrop?.classList.remove('active');
+    };
+
+    if (mobileToggle) mobileToggle.addEventListener('click', openSidebar);
+    if (backdrop) backdrop.addEventListener('click', closeSidebar);
+
+    // Sidebar View Navigation
+    document.querySelectorAll('.sidebar-item[data-view]').forEach(item => {
+      item.addEventListener('click', () => {
+        const viewId = item.getAttribute('data-view');
+        this.switchView(viewId);
+        if (window.innerWidth <= 992) closeSidebar();
       });
     });
 
-    // Theme Toggle
+    // Brand Home Trigger
+    document.getElementById('brandHomeTrigger')?.addEventListener('click', () => {
+      this.switchView('view-chat');
+    });
+
+    // Sidebar Channel Switcher
+    document.querySelectorAll('#channelList .sidebar-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const idx = parseInt(item.getAttribute('data-channel-idx'), 10);
+        document.querySelectorAll('#channelList .sidebar-item').forEach(b => b.classList.remove('active'));
+        item.classList.add('active');
+        this.loadChannel(idx);
+        this.switchView('view-chat');
+        if (window.innerWidth <= 992) closeSidebar();
+      });
+    });
+
+    // Theme Toggle (Dark: Black & Green | Light: White & Blue)
     const themeBtn = document.getElementById('themeToggleBtn');
     if (themeBtn) {
       themeBtn.addEventListener('click', () => {
@@ -103,45 +325,59 @@ class CommitPulseApp {
         const currentTheme = root.getAttribute('data-theme') || 'dark';
         const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
         root.setAttribute('data-theme', newTheme);
-        themeBtn.textContent = newTheme === 'dark' ? '🌓' : '☀️';
+        this.showToast(`Switched to ${newTheme.toUpperCase()} theme (${newTheme === 'dark' ? 'Black & Green' : 'White & Blue'})`);
         this.renderAnalytics();
       });
     }
 
-    // Channel Preset Buttons
-    document.querySelectorAll('.channel-btn').forEach((btn, idx) => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.channel-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        this.activeChannelIndex = idx;
-        this.loadChannelPreview(PRELOADED_COMMS[idx]);
-      });
+    // Quick Action Queue Trigger
+    document.getElementById('quickInboxBtn')?.addEventListener('click', () => {
+      this.switchView('view-inbox');
     });
 
-    // Run Detection Button on Simulator Deck
-    const scanBtn = document.getElementById('runDetectionBtn');
-    if (scanBtn) {
-      scanBtn.addEventListener('click', async () => {
-        const activeComm = PRELOADED_COMMS[this.activeChannelIndex];
-        this.showToast(`🧠 Scanning ${activeComm.channelName} with NLP engine...`);
-        
-        const extracted = await this.commitmentEngine.analyzeCommunication({
-          text: activeComm.rawContent,
-          sourceType: activeComm.channelType === "slack" ? "Slack" : activeComm.channelType === "email" ? "Email" : "Meeting",
-          sourceChannel: activeComm.channelName,
-          sender: activeComm.sender
-        });
+    // Employee Creator Triggers (Everywhere in the UI)
+    const triggerEmpCreator = () => {
+      if (this.currentUser && !this.currentUser.isAdmin && this.currentUser.role !== 'Administrator') {
+        this.showToast('Administrator privileges required to create employee accounts.');
+        return;
+      }
+      this.switchView('view-analytics');
+      this.openAddMemberModal();
+    };
 
-        this.inboxManager.addCommitments(extracted);
-        this.showToast(`🎉 Detected ${extracted.length} commitments added to AI Inbox!`);
-        
-        setTimeout(() => {
-          document.querySelector('[data-tab="tab-inbox"]')?.click();
-        }, 400);
+    document.getElementById('quickCreateEmpHeaderBtn')?.addEventListener('click', triggerEmpCreator);
+    document.getElementById('openAddMemberSidebarBtn')?.addEventListener('click', triggerEmpCreator);
+    document.getElementById('chipCreateEmployee')?.addEventListener('click', triggerEmpCreator);
+    document.getElementById('chipManageEmployees')?.addEventListener('click', () => this.switchView('view-analytics'));
+    document.getElementById('openAddMemberBtn')?.addEventListener('click', triggerEmpCreator);
+
+    // Ingest Modals & Triggers
+    document.getElementById('openIngestModalHeaderBtn')?.addEventListener('click', () => this.openIngestModal());
+    document.getElementById('openIngestModalBtn')?.addEventListener('click', () => this.openIngestModal());
+    document.getElementById('chipIngestMeeting')?.addEventListener('click', () => this.openIngestModal());
+    document.getElementById('chipCheckRadar')?.addEventListener('click', () => this.switchView('view-radar'));
+    document.getElementById('chipCustomPromise')?.addEventListener('click', () => {
+      const input = document.getElementById('chatInputText');
+      if (input) {
+        input.value = 'Please review and deploy the new authentication update by Friday 5:00 PM.';
+        input.focus();
+      }
+    });
+
+    // Chat Send & Scan Input
+    const sendBtn = document.getElementById('chatSendBtn');
+    const chatInput = document.getElementById('chatInputText');
+    if (sendBtn && chatInput) {
+      sendBtn.addEventListener('click', () => this.handleSendMessage());
+      chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          this.handleSendMessage();
+        }
       });
     }
 
-    // AI Inbox Filters
+    // Action Queue Filters
     document.getElementById('inboxSourceFilter')?.addEventListener('change', (e) => {
       this.inboxManager.setFilters({ source: e.target.value });
     });
@@ -150,7 +386,7 @@ class CommitPulseApp {
     });
     document.getElementById('inboxConfirmAllBtn')?.addEventListener('click', () => {
       this.inboxManager.confirmAll();
-      this.showToast('✅ Confirmed all pending commitments to My Tasks!');
+      this.showToast('Approved all pending commitments to Deliverables Board');
     });
 
     // Task Filters & Search
@@ -160,258 +396,514 @@ class CommitPulseApp {
     document.getElementById('taskPriorityFilter')?.addEventListener('change', (e) => {
       this.taskManager.setFilters({ priority: e.target.value });
     });
-    document.getElementById('taskSourceFilter')?.addEventListener('change', (e) => {
-      this.taskManager.setFilters({ source: e.target.value });
-    });
     document.getElementById('taskSearchInput')?.addEventListener('input', (e) => {
       this.taskManager.setFilters({ search: e.target.value });
     });
 
-    // Task View Mode Switcher
+    // Task View Switcher (Kanban vs List)
     const kanbanBtn = document.getElementById('viewKanbanBtn');
     const listBtn = document.getElementById('viewListBtn');
     if (kanbanBtn && listBtn) {
       kanbanBtn.addEventListener('click', () => {
-        kanbanBtn.style.background = 'rgba(16,185,129,0.15)';
+        kanbanBtn.style.background = 'var(--color-primary-light)';
         kanbanBtn.style.color = 'var(--color-primary)';
-        kanbanBtn.style.borderColor = 'rgba(16,185,129,0.3)';
+        kanbanBtn.style.borderColor = 'var(--border-glow)';
         listBtn.style.background = 'var(--bg-card)';
         listBtn.style.color = 'var(--text-primary)';
-        listBtn.style.borderColor = 'var(--border-subtle)';
+        listBtn.style.borderColor = 'var(--border-medium)';
         this.taskManager.setViewMode('kanban');
       });
       listBtn.addEventListener('click', () => {
-        listBtn.style.background = 'rgba(16,185,129,0.15)';
+        listBtn.style.background = 'var(--color-primary-light)';
         listBtn.style.color = 'var(--color-primary)';
-        listBtn.style.borderColor = 'rgba(16,185,129,0.3)';
+        listBtn.style.borderColor = 'var(--border-glow)';
         kanbanBtn.style.background = 'var(--bg-card)';
         kanbanBtn.style.color = 'var(--text-primary)';
-        kanbanBtn.style.borderColor = 'var(--border-subtle)';
+        kanbanBtn.style.borderColor = 'var(--border-medium)';
         this.taskManager.setViewMode('list');
       });
     }
 
-    // Ingest Modal Triggers
-    document.getElementById('openIngestModalBtn')?.addEventListener('click', () => this.openIngestModal());
+    // Modals & Forms
     document.getElementById('runCustomIngestBtn')?.addEventListener('click', () => this.handleCustomIngest());
-
-    // Settings Modal Triggers
     document.getElementById('openSettingsBtn')?.addEventListener('click', () => this.openSettingsModal());
     document.getElementById('saveSettingsBtn')?.addEventListener('click', () => this.saveSettings());
-
-    // Edit Commitment Save
     document.getElementById('saveEditCommitmentBtn')?.addEventListener('click', () => this.saveEditCommitment());
-
-    // Delegate Commitment Save
     document.getElementById('saveDelegateBtn')?.addEventListener('click', () => this.saveDelegation());
-
-    // Task Detail Save & Delete
     document.getElementById('modalSaveTaskBtn')?.addEventListener('click', () => this.saveTaskModal());
     document.getElementById('modalDeleteTaskBtn')?.addEventListener('click', () => this.deleteTaskModal());
     document.getElementById('addNewTaskManualBtn')?.addEventListener('click', () => this.openNewTaskModal());
-
-    // Export Audit Log CSV
     document.getElementById('exportAuditCsvBtn')?.addEventListener('click', () => this.exportAuditCSV());
+    document.getElementById('saveAddMemberBtn')?.addEventListener('click', () => this.saveAddMember());
 
-    // Pricing Billing Toggle
+    // Inline Employee Creation Form in Team View
+    document.getElementById('inlineCreateEmployeeForm')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = document.getElementById('inlineEmpName')?.value.trim();
+      const email = document.getElementById('inlineEmpEmail')?.value.trim().toLowerCase();
+      const password = document.getElementById('inlineEmpPassword')?.value.trim();
+      const role = document.getElementById('inlineEmpRole')?.value.trim() || 'Software Engineer';
+      const dept = 'Engineering';
+      this.createEmployeeAccount({ name, email, password, role, dept });
+      document.getElementById('inlineEmpName').value = '';
+      document.getElementById('inlineEmpEmail').value = '';
+      document.getElementById('inlineEmpPassword').value = '';
+      document.getElementById('inlineEmpRole').value = '';
+    });
+
+    // SaaS Pricing Billing Toggle (INR ₹)
     const billingToggle = document.getElementById('pricingBillingToggle');
     if (billingToggle) {
       billingToggle.addEventListener('change', (e) => {
         const isAnnual = e.target.checked;
-        document.getElementById('proPriceDisplay').textContent = isAnnual ? '₹239' : '₹299';
-        document.getElementById('teamPriceDisplay').textContent = isAnnual ? '₹479' : '₹599';
+        const proPrice = document.getElementById('proPriceDisplay');
+        const teamPrice = document.getElementById('teamPriceDisplay');
+        if (proPrice) proPrice.textContent = isAnnual ? '₹249' : '₹299';
+        if (teamPrice) teamPrice.textContent = isAnnual ? '₹649' : '₹799';
       });
     }
   }
 
-  loadChannelPreview(comm) {
-    const badge = document.getElementById('activeChannelBadge');
-    const timestamp = document.getElementById('activeChannelTimestamp');
-    const feedContainer = document.getElementById('richChannelFeed');
+  switchView(viewId) {
+    this.activeViewId = viewId;
 
-    if (badge) {
-      badge.textContent = `${comm.channelIcon} Channel: ${comm.channelName}`;
-      badge.style.color = comm.channelType === 'slack' ? 'var(--color-slack)' : comm.channelType === 'email' ? 'var(--color-email)' : 'var(--color-zoom)';
+    document.querySelectorAll('.sidebar-item[data-view]').forEach(item => {
+      if (item.getAttribute('data-view') === viewId) {
+        item.classList.add('active');
+      } else {
+        item.classList.remove('active');
+      }
+    });
+
+    document.querySelectorAll('.view-pane').forEach(pane => {
+      pane.classList.remove('active');
+    });
+
+    const targetPane = document.getElementById(viewId);
+    if (targetPane) {
+      targetPane.classList.add('active');
     }
-    if (timestamp) timestamp.textContent = comm.timestamp;
 
-    if (feedContainer) {
-      feedContainer.innerHTML = this.formatRichFeed(comm);
+    if (viewId === 'view-analytics') {
+      setTimeout(() => this.renderAnalytics(), 80);
+    }
+    if (viewId === 'view-history') {
+      this.renderAuditHistory();
+    }
+    if (viewId === 'view-radar') {
+      this.renderRadarRisks();
     }
   }
 
-  formatRichFeed(comm) {
-    if (comm.channelType === "slack") {
-      const lines = comm.rawContent.split('\n');
-      const avatarMap = {
-        'Aarav': '👨‍💼',
-        'Rahul': '👨‍💻',
-        'Priya': '👩‍🎨',
-        'Vikram': '👨‍🔧',
-        'Neha': '👩‍💼'
-      };
+  loadChannel(index) {
+    this.activeChannelIndex = index;
 
-      return lines.map(line => {
-        const colonIdx = line.indexOf(':');
-        if (colonIdx === -1) return `<div class="chat-text">${line}</div>`;
-        const sender = line.substring(0, colonIdx).trim();
-        const text = line.substring(colonIdx + 1).trim();
-        const avatar = avatarMap[sender] || '👤';
-        const isCommitment = text.includes('please send') || text.includes('will complete') || text.includes('check with') || text.includes('review the');
+    if (index === 1) {
+      this.renderCopilotView();
+      return;
+    }
 
-        return `
-          <div class="chat-bubble-row">
-            <div class="chat-avatar">${avatar}</div>
-            <div class="chat-msg-body">
-              <div class="chat-msg-meta">
-                <span class="chat-sender-name">${sender}</span>
-                <span class="chat-timestamp">10:42 AM</span>
-                ${isCommitment ? '<span style="font-size: 0.7rem; background: rgba(16,185,129,0.15); color: var(--color-primary); padding: 1px 6px; border-radius: 4px; font-weight: 700;">⚡ Commitment Detected</span>' : ''}
-              </div>
-              <div class="chat-text ${isCommitment ? 'chat-commitment-highlight' : ''}">${text}</div>
+    const headerIcon = document.getElementById('headerChannelIcon');
+    const headerTitle = document.getElementById('headerChannelTitle');
+    const headerType = document.getElementById('headerChannelType');
+    const headerMeta = document.getElementById('headerChannelMeta');
+
+    if (headerIcon) headerIcon.textContent = 'MS';
+    if (headerTitle) headerTitle.textContent = 'Active Meeting Stream';
+    if (headerType) headerType.textContent = 'Real-time NLP';
+    if (headerMeta) headerMeta.textContent = 'Ready to extract commitments, deadlines, and deliverables';
+
+    const container = document.getElementById('dynamicChatThread');
+    if (container) {
+      if (this.communicationStreams.length === 0) {
+        container.innerHTML = `
+          <div class="empty-stream-card">
+            <h3 class="empty-stream-title">No Meeting Stream Ingested Yet</h3>
+            <p class="empty-stream-desc">
+              Paste meeting audio transcripts, client emails, or team chat logs. Meetpulse will automatically extract promises, assign responsible owners, and set deadlines.
+            </p>
+            <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap;">
+              <button class="btn btn-primary" onclick="window.commitPulseApp.openIngestModal()">
+                Ingest Meeting Audio / Notes
+              </button>
+              <button class="btn btn-secondary" onclick="window.commitPulseApp.switchView('view-analytics')">
+                + Create Employee Account
+              </button>
             </div>
           </div>
         `;
-      }).join('');
-    } else if (comm.channelType === "email") {
-      return `
-        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1.15rem; font-size: 0.875rem;">
-          <div style="display: grid; grid-template-columns: 80px 1fr; gap: 0.4rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-subtle); margin-bottom: 0.85rem; font-size: 0.825rem;">
-            <strong style="color: var(--text-muted);">From:</strong> <span>Sarah Jenkins &lt;sjenkins@apexfin.com&gt;</span>
-            <strong style="color: var(--text-muted);">To:</strong> <span>dev-leads@company.com</span>
-            <strong style="color: var(--text-muted);">Subject:</strong> <span style="font-weight: 700; color: var(--text-primary);">Re: Production Database Migration Timeline & SLA</span>
+      } else {
+        container.innerHTML = this.communicationStreams.map(s => this.buildStreamItemHTML(s)).join('');
+      }
+    }
+  }
+
+  buildStreamItemHTML(stream) {
+    let threadHtml = `
+      <div class="chat-message-group msg-other">
+        <div class="avatar-initials">${stream.senderAvatar || 'MS'}</div>
+        <div class="chat-bubble-content" style="width: 100%;">
+          <div class="chat-sender-header">
+            <span class="chat-sender-name">${stream.channelName}</span>
+            <span class="chat-timestamp">${stream.timestamp}</span>
+            <span class="chat-source-tag">${stream.sourceType}</span>
           </div>
-          <div style="line-height: 1.6; color: #e2e8f0; white-space: pre-wrap;">Hi Team,
+          <div class="chat-bubble">
+            <div class="audio-waveform-deck">
+              <span style="font-size: 0.78rem; font-weight: 700; color: var(--color-primary);">Audio Stream Recorded:</span>
+              <div class="waveform-bars">
+                <div class="waveform-bar" style="animation-delay: 0.1s;"></div>
+                <div class="waveform-bar" style="animation-delay: 0.3s;"></div>
+                <div class="waveform-bar" style="animation-delay: 0.2s;"></div>
+                <div class="waveform-bar" style="animation-delay: 0.4s;"></div>
+                <div class="waveform-bar" style="animation-delay: 0.15s;"></div>
+              </div>
+              <span style="font-size: 0.72rem; color: var(--text-muted); margin-left: auto;">Duration: 18m 40s</span>
+            </div>
+            <div style="line-height: 1.6; font-size: 0.88rem; white-space: pre-wrap;">${this.escapeHtml(stream.rawContent)}</div>
+          </div>
+        </div>
+      </div>
+    `;
 
-We need confirmation on the database failover SLA before signing the master service agreement.
-<span class="chat-commitment-highlight">Could someone from backend please provide the updated RPO/RTO benchmark document by tomorrow EOD?</span>
-<span class="chat-commitment-highlight">Also, please update the staging environment with sanitized data by Thursday.</span>
-
-Best regards,
-Sarah Jenkins (VP Tech, Apex Financial)</div>
+    if (stream.detectedCommitments && stream.detectedCommitments.length > 0) {
+      threadHtml += `
+        <div class="chat-message-group msg-ai" style="margin-top: 1rem;">
+          <div class="avatar-initials">MP</div>
+          <div class="chat-bubble-content" style="width: 100%;">
+            <div class="chat-sender-header">
+              <span class="chat-sender-name" style="color: var(--color-primary);">Meetpulse AI</span>
+              <span class="chat-timestamp">Extraction Verified</span>
+              <span class="chat-source-tag">${stream.detectedCommitments.length} Deliverables</span>
+            </div>
+            <div class="chat-bubble">
+              <div style="font-weight: 700; font-size: 0.88rem; margin-bottom: 0.5rem;">
+                Extracted ${stream.detectedCommitments.length} deliverable(s). Click <strong>Approve Deliverable</strong> to confirm:
+              </div>
+              <div class="inchat-commitment-deck">
+                ${stream.detectedCommitments.map(item => this.buildInChatCommitmentCardHTML(item)).join('')}
+              </div>
+            </div>
+          </div>
         </div>
       `;
+    }
+
+    return threadHtml;
+  }
+
+  buildInChatCommitmentCardHTML(item) {
+    this.inchatCommitmentsMap.set(item.id, item);
+    const priorityBadge = item.priority === 'Urgent' ? 'badge-urgent' : item.priority === 'High' ? 'badge-high' : 'badge-medium';
+
+    return `
+      <div class="inchat-commitment-card" id="inchat-card-${item.id}">
+        <div class="inchat-card-top">
+          <div class="inchat-task-title">${item.taskTitle}</div>
+          <div class="inchat-badges-row">
+            <span class="badge ${priorityBadge}">${item.priority}</span>
+            <span class="badge badge-confidence">${item.confidence}% Match</span>
+          </div>
+        </div>
+
+        <div class="inchat-meta-grid">
+          <div class="inchat-meta-item">
+            <span class="inchat-meta-lbl">Responsible Member</span>
+            <span class="inchat-meta-val">
+              <span class="avatar-initials avatar-sm">${item.ownerAvatar || 'ST'}</span>
+              ${item.owner}
+            </span>
+          </div>
+          <div class="inchat-meta-item">
+            <span class="inchat-meta-lbl">Target Deadline</span>
+            <span class="inchat-meta-val" style="color: var(--color-warning);">${item.deadline}</span>
+          </div>
+          <div class="inchat-meta-item">
+            <span class="inchat-meta-lbl">Context</span>
+            <span class="inchat-meta-val">${item.sourceChannel}</span>
+          </div>
+        </div>
+
+        <div class="inchat-quote-box">
+          "${item.originalSnippet}"
+        </div>
+
+        <div class="inchat-card-actions" id="inchat-actions-${item.id}">
+          <button class="btn btn-secondary btn-sm" onclick="window.commitPulseApp.openEditCommitmentModal('${item.id}')">
+            Edit
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="window.commitPulseApp.openDelegateModal('${item.id}')">
+            Reassign
+          </button>
+          <button class="btn btn-danger btn-sm" onclick="window.commitPulseApp.inboxManager.dismissCommitment('${item.id}')">
+            Dismiss
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="window.commitPulseApp.inboxManager.confirmCommitment('${item.id}')">
+            Approve Deliverable
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  updateInChatCardStatus(commitmentId, status, taskId = '') {
+    const actionsContainer = document.getElementById(`inchat-actions-${commitmentId}`);
+    const card = document.getElementById(`inchat-card-${commitmentId}`);
+    if (actionsContainer && card) {
+      if (status === 'confirmed') {
+        actionsContainer.innerHTML = `
+          <span style="font-size: 0.8rem; font-weight: 700; color: var(--color-primary); display: inline-flex; align-items: center; gap: 0.35rem;">
+            Approved Deliverable [${taskId}] Added to Deliverables Board
+          </span>
+        `;
+        card.style.borderColor = 'var(--color-primary)';
+      } else if (status === 'dismissed') {
+        actionsContainer.innerHTML = `
+          <span style="font-size: 0.8rem; color: var(--text-muted);">
+            Dismissed from action item queue.
+          </span>
+        `;
+        card.style.opacity = '0.5';
+      }
+    }
+  }
+
+  renderCopilotView() {
+    const headerIcon = document.getElementById('headerChannelIcon');
+    const headerTitle = document.getElementById('headerChannelTitle');
+    const headerType = document.getElementById('headerChannelType');
+    const headerMeta = document.getElementById('headerChannelMeta');
+
+    if (headerIcon) headerIcon.textContent = 'MP';
+    if (headerTitle) headerTitle.textContent = 'Meetpulse Copilot';
+    if (headerType) headerType.textContent = 'Universal Assistant';
+    if (headerMeta) headerMeta.textContent = 'Query deliverables, check deadlines, or extract action items.';
+
+    const container = document.getElementById('dynamicChatThread');
+    if (container) {
+      container.innerHTML = `
+        <div class="chat-message-group msg-ai">
+          <div class="avatar-initials">MP</div>
+          <div class="chat-bubble-content">
+            <div class="chat-sender-header">
+              <span class="chat-sender-name" style="color: var(--color-primary);">Meetpulse Copilot</span>
+              <span class="chat-timestamp">Online</span>
+            </div>
+            <div class="chat-bubble">
+              <p>Welcome to <strong>Meetpulse AI</strong>. I monitor team discussions and meeting streams to automatically extract commitments and track deliverables.</p>
+              <p style="margin-top: 0.5rem;">Sample queries you can input:</p>
+              <ul style="margin-left: 1.25rem; margin-top: 0.35rem; font-size: 0.84rem; color: var(--text-secondary);">
+                <li><em>"Please deploy the database backup script by Friday 5:00 PM"</em></li>
+                <li><em>"I will finalize the API documentation tomorrow before noon"</em></li>
+                <li><em>"What deliverables are currently at risk?"</em></li>
+                <li><em>"Show team punctuality scores"</em></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  async handleSendMessage() {
+    const input = document.getElementById('chatInputText');
+    const sourceSelect = document.getElementById('chatSourceSelect');
+    if (!input || !input.value.trim()) return;
+
+    const userText = input.value.trim();
+    const source = sourceSelect ? sourceSelect.value : 'Direct Entry';
+    input.value = '';
+
+    const container = document.getElementById('dynamicChatThread');
+    if (!container) return;
+
+    const emptyCard = container.querySelector('.empty-stream-card');
+    if (emptyCard) emptyCard.remove();
+
+    const userName = this.currentUser ? this.currentUser.name : 'Team Member';
+    const userAvatar = this.currentUser ? this.currentUser.avatar : 'TM';
+
+    const userMsgHTML = `
+      <div class="chat-message-group msg-user">
+        <div class="avatar-initials">${userAvatar}</div>
+        <div class="chat-bubble-content">
+          <div class="chat-sender-header">
+            <span class="chat-sender-name">${userName}</span>
+            <span class="chat-timestamp">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            <span class="chat-source-tag">${source}</span>
+          </div>
+          <div class="chat-bubble">${this.escapeHtml(userText)}</div>
+        </div>
+      </div>
+    `;
+    container.insertAdjacentHTML('beforeend', userMsgHTML);
+
+    const scrollContainer = document.getElementById('chatStreamContainer');
+    if (scrollContainer) scrollContainer.scrollTop = scrollContainer.scrollHeight;
+
+    this.showToast('Analyzing text with Meetpulse NLP Engine...');
+
+    const extracted = await this.commitmentEngine.analyzeCommunication({
+      text: userText,
+      sourceType: source,
+      sourceChannel: 'Direct Submission',
+      sender: userName
+    });
+
+    if (extracted && extracted.length > 0) {
+      this.inboxManager.addCommitments(extracted);
+
+      setTimeout(() => {
+        const aiResponseHTML = `
+          <div class="chat-message-group msg-ai">
+            <div class="avatar-initials">MP</div>
+            <div class="chat-bubble-content" style="width: 100%;">
+              <div class="chat-sender-header">
+                <span class="chat-sender-name" style="color: var(--color-primary);">Meetpulse AI</span>
+                <span class="chat-timestamp">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                <span class="chat-source-tag">Detected ${extracted.length} Action Items</span>
+              </div>
+              <div class="chat-bubble">
+                <div style="font-weight: 700; font-size: 0.88rem; margin-bottom: 0.5rem;">
+                  Detected ${extracted.length} commitment(s) from your input. Click <strong>Approve Deliverable</strong> to confirm:
+                </div>
+                <div class="inchat-commitment-deck">
+                  ${extracted.map(item => this.buildInChatCommitmentCardHTML(item)).join('')}
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+        container.insertAdjacentHTML('beforeend', aiResponseHTML);
+        if (scrollContainer) scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        this.showToast(`Extracted ${extracted.length} action items added to Action Queue`);
+      }, 400);
+
     } else {
-      // Zoom Meeting Transcript
-      return `
-        <div>
-          <div class="audio-waveform-deck" title="Live Zoom Audio Stream Transcribed">
-            <span style="font-size: 0.75rem; font-weight: 700; color: var(--color-zoom); margin-right: 6px;">🎙️ Audio Transcript:</span>
-            <div class="waveform-bar" style="animation-delay: 0.1s;"></div>
-            <div class="waveform-bar" style="animation-delay: 0.3s;"></div>
-            <div class="waveform-bar" style="animation-delay: 0.15s;"></div>
-            <div class="waveform-bar" style="animation-delay: 0.45s;"></div>
-            <div class="waveform-bar" style="animation-delay: 0.25s;"></div>
-            <div class="waveform-bar" style="animation-delay: 0.5s;"></div>
-            <div class="waveform-bar" style="animation-delay: 0.2s;"></div>
+      setTimeout(() => {
+        const aiResponseHTML = `
+          <div class="chat-message-group msg-ai">
+            <div class="avatar-initials">MP</div>
+            <div class="chat-bubble-content">
+              <div class="chat-sender-header">
+                <span class="chat-sender-name" style="color: var(--color-primary);">Meetpulse AI</span>
+                <span class="chat-timestamp">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+              <div class="chat-bubble">
+                <p>Scanned your message. No explicit action items, deadlines, or deliverables detected. Try phrases like <em>"Please deliver..."</em> or <em>"I will complete by Friday"</em>.</p>
+              </div>
+            </div>
           </div>
-          <div style="font-size: 0.875rem; line-height: 1.7; color: #cbd5e1; white-space: pre-wrap; margin-top: 0.5rem;">[00:14:10] <strong>David Chen (VP Eng):</strong> "We need the API rate limiter merged before the mobile release on Monday."
-[00:14:32] <strong>Kavita Rao (Lead Dev):</strong> "<span class="chat-commitment-highlight">I will optimize the Redis cache layer and push the pull request by Friday 3 PM.</span>"
-[00:15:05] <strong>David Chen:</strong> "<span class="chat-commitment-highlight">Great. Rohan, can you verify the load testing benchmarks by Friday evening?</span>"
-[00:15:20] <strong>Rohan Mehta (QA):</strong> "Understood, will complete the load tests on staging."</div>
-        </div>
-      `;
+        `;
+        container.insertAdjacentHTML('beforeend', aiResponseHTML);
+        if (scrollContainer) scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }, 350);
     }
   }
 
   updateDashboardKPIs() {
-    const inboxStats = this.inboxManager ? this.inboxManager.getStats() : { pendingCount: 4 };
-    const taskStats = this.taskManager ? this.taskManager.getStats() : { total: 5, forgottenRisks: 2 };
+    const inboxStats = this.inboxManager ? this.inboxManager.getStats() : { pendingCount: 0 };
+    const taskStats = this.taskManager ? this.taskManager.getStats() : { total: 0, forgottenRisks: 0 };
 
-    const totalDetected = inboxStats.pendingCount + taskStats.total;
-    document.getElementById('statDetectedCount').textContent = totalDetected;
-    document.getElementById('statPendingCount').textContent = inboxStats.pendingCount;
-    document.getElementById('statActiveCount').textContent = taskStats.total;
-    document.getElementById('statRisksCount').textContent = taskStats.forgottenRisks;
+    const totalDetected = (inboxStats.pendingCount || 0) + (taskStats.total || 0);
 
-    // Badges in Header Tabs
-    const inboxBadge = document.getElementById('navInboxBadge');
-    if (inboxBadge) inboxBadge.textContent = inboxStats.pendingCount;
-    const tasksBadge = document.getElementById('navTasksBadge');
-    if (tasksBadge) tasksBadge.textContent = taskStats.total;
+    const headerInboxCount = document.getElementById('headerInboxCount');
+    if (headerInboxCount) headerInboxCount.textContent = inboxStats.pendingCount;
+
+    const sidebarInboxBadge = document.getElementById('sidebarInboxBadge');
+    if (sidebarInboxBadge) sidebarInboxBadge.textContent = inboxStats.pendingCount;
+
+    const sidebarTasksBadge = document.getElementById('sidebarTasksBadge');
+    if (sidebarTasksBadge) sidebarTasksBadge.textContent = taskStats.total;
+
+    const sidebarRisksBadge = document.getElementById('sidebarRisksBadge');
+    if (sidebarRisksBadge) sidebarRisksBadge.textContent = taskStats.forgottenRisks;
+
+    const sidebarEmployeesCount = document.getElementById('sidebarEmployeesCount');
+    if (sidebarEmployeesCount) sidebarEmployeesCount.textContent = this.registeredUsers.length;
+
+    const rosterBadge = document.getElementById('rosterCountBadge');
+    if (rosterBadge) rosterBadge.textContent = `${this.registeredUsers.length} Account${this.registeredUsers.length > 1 ? 's' : ''} Registered`;
+
+    const statHeroDetected = document.getElementById('statHeroDetected');
+    if (statHeroDetected) statHeroDetected.textContent = totalDetected;
+
+    const statHeroPending = document.getElementById('statHeroPending');
+    if (statHeroPending) statHeroPending.textContent = inboxStats.pendingCount;
+
+    const statHeroActive = document.getElementById('statHeroActive');
+    if (statHeroActive) statHeroActive.textContent = taskStats.total;
+
+    const statHeroEmployees = document.getElementById('statHeroEmployees');
+    if (statHeroEmployees) statHeroEmployees.textContent = this.registeredUsers.length;
   }
 
-  populateTeamDropdowns() {
-    const ownerFilter = document.getElementById('taskOwnerFilter');
-    const delegateSelect = document.getElementById('delegateMemberSelect');
+  renderRadarRisks() {
+    const container = document.getElementById('radarRiskItemsContainer');
+    if (!container || !this.taskManager) return;
 
-    if (ownerFilter) {
-      ownerFilter.innerHTML = `<option value="all">👥 All Team Owners</option>` +
-        this.teamMembers.map(m => `<option value="${m.name}">${m.avatar} ${m.name}</option>`).join('');
+    const tasks = this.taskManager.getTasks();
+    const risks = tasks.filter(t => t.isForgottenRisk && t.status !== 'done');
+
+    if (risks.length === 0) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+          <strong>No high-risk deliverables detected</strong>
+          <p style="font-size: 0.85rem; margin-top: 4px;">All commitments are progressing on schedule.</p>
+        </div>
+      `;
+      return;
     }
 
-    if (delegateSelect) {
-      delegateSelect.innerHTML = this.teamMembers.map(m => 
-        `<option value="${m.name}">${m.avatar} ${m.name} (${m.role})</option>`
-      ).join('');
-    }
-  }
-
-  renderTeamMembers() {
-    const container = document.getElementById('teamMembersGrid');
-    if (!container) return;
-
-    container.innerHTML = this.teamMembers.map(m => `
-      <div class="member-card">
-        <div style="display: flex; align-items: center; gap: 0.85rem; flex: 1;">
-          <div class="member-avatar">
-            ${m.avatar}
+    container.innerHTML = risks.map(r => `
+      <div style="background: var(--bg-card); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: var(--radius-md); padding: 1.15rem; margin-bottom: 0.85rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+        <div>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span class="badge badge-urgent">Deadline Risk</span>
+            <span style="font-weight: 700; color: var(--text-primary); font-size: 0.92rem;">[${r.id}] ${r.title}</span>
           </div>
-          <div>
-            <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary); font-family: var(--font-heading);">${m.name}</div>
-            <div style="font-size: 0.775rem; color: var(--text-secondary);">${m.role} • ${m.department}</div>
+          <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.35rem;">
+            Member: <strong>${r.owner}</strong> • Deadline: <strong style="color: var(--color-danger);">${r.deadline}</strong> • Context: ${r.sourceChannel}
           </div>
         </div>
-        <div style="text-align: right;">
-          <div style="font-weight: 800; font-size: 1.15rem; color: var(--color-primary); font-family: var(--font-heading);">${m.reliabilityScore}%</div>
-          <div style="font-size: 0.725rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Reliability</div>
+
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <button class="btn btn-secondary btn-sm" onclick="window.commitPulseApp.openTaskModal('${r.id}')">
+            Details
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="window.commitPulseApp.sendSlackNudge('${r.id}', '${r.owner}')">
+            Send Nudge
+          </button>
         </div>
       </div>
     `).join('');
   }
 
-  renderAuditHistory() {
-    const tableBody = document.getElementById('auditHistoryTableBody');
-    if (!tableBody || !this.taskManager) return;
-
-    const history = this.taskManager.getAuditHistory();
-    if (history.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">No audit logs recorded yet.</td></tr>`;
-      return;
-    }
-
-    tableBody.innerHTML = history.slice(0, 15).map(h => `
-      <tr>
-        <td style="font-family: var(--font-mono); font-size: 0.775rem; color: var(--text-muted);">${h.timestamp}</td>
-        <td>
-          <span style="font-weight: 700; color: var(--color-primary); font-family: var(--font-mono); font-size: 0.75rem;">${h.taskId}</span>
-          <div style="font-weight: 600; font-size: 0.875rem;">${h.title}</div>
-        </td>
-        <td><strong>${h.owner}</strong></td>
-        <td><span style="font-size: 0.8rem; color: var(--text-secondary);">${h.sourceType || 'Direct'} (${h.sourceChannel || 'General'})</span></td>
-        <td><span style="background: rgba(16,185,129,0.15); color: var(--color-primary); padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 0.75rem;">${h.action}</span></td>
-      </tr>
-    `).join('');
+  sendSlackNudge(taskId, owner) {
+    this.showToast(`Automated reminder nudge sent to ${owner} for [${taskId}]`);
   }
 
   renderAnalytics() {
-    const confirmedCount = this.taskManager ? this.taskManager.getTasks().length : 5;
-    const pendingCount = this.inboxManager ? this.inboxManager.getCommitments().length : 4;
-    const dismissedCount = this.inboxManager ? this.inboxManager.getStats().dismissedCount : 1;
+    const isDark = (document.documentElement.getAttribute('data-theme') || 'dark') === 'dark';
+    const textColor = isDark ? '#a1a1aa' : '#475569';
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
+    const primaryColor = isDark ? '#10b981' : '#2563eb';
+    const accentColor = isDark ? '#34d399' : '#0284c7';
 
-    // Conversion Doughnut Chart
-    const convCanvas = document.getElementById('conversionDoughnutChart');
-    if (convCanvas && window.Chart) {
+    const ctx1 = document.getElementById('conversionDoughnutChart');
+    if (ctx1) {
       if (this.charts.conversion) this.charts.conversion.destroy();
-      this.charts.conversion = new window.Chart(convCanvas, {
+      const stats = this.taskManager ? this.taskManager.getStats() : { done: 0, inProgress: 0, todo: 0 };
+      const inboxStats = this.inboxManager ? this.inboxManager.getStats() : { pendingCount: 0 };
+
+      this.charts.conversion = new Chart(ctx1, {
         type: 'doughnut',
         data: {
-          labels: ['Confirmed Tasks', 'Pending Review', 'Dismissed / Non-Tasks'],
+          labels: ['Completed', 'In Progress / Todo', 'Action Queue Pending'],
           datasets: [{
-            data: [confirmedCount, pendingCount, Math.max(1, dismissedCount)],
-            backgroundColor: ['#10b981', '#f59e0b', '#64748b'],
-            borderColor: '#070a13',
-            borderWidth: 3,
+            data: [stats.done || 1, (stats.inProgress + stats.todo) || 1, inboxStats.pendingCount || 1],
+            backgroundColor: [primaryColor, accentColor, '#71717a'],
+            borderWidth: 0,
             hoverOffset: 6
           }]
         },
@@ -420,29 +912,28 @@ Sarah Jenkins (VP Tech, Apex Financial)</div>
           maintainAspectRatio: false,
           plugins: {
             legend: {
-              position: 'right',
-              labels: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans', size: 12, weight: 600 } }
+              position: 'bottom',
+              labels: { color: textColor, font: { family: 'Plus Jakarta Sans', size: 12 } }
             }
           },
-          cutout: '68%'
+          cutout: '70%'
         }
       });
     }
 
-    // Reliability Bar Chart
-    const relCanvas = document.getElementById('reliabilityBarChart');
-    if (relCanvas && window.Chart) {
+    const ctx2 = document.getElementById('reliabilityBarChart');
+    if (ctx2) {
       if (this.charts.reliability) this.charts.reliability.destroy();
-      this.charts.reliability = new window.Chart(relCanvas, {
+      this.charts.reliability = new Chart(ctx2, {
         type: 'bar',
         data: {
-          labels: this.teamMembers.map(m => m.name.split(' ')[0]),
+          labels: this.registeredUsers.map(m => m.name.split(' ')[0]),
           datasets: [{
-            label: 'Reliability Index %',
-            data: this.teamMembers.map(m => m.reliabilityScore),
-            backgroundColor: '#06b6d4',
-            borderRadius: 8,
-            borderSkipped: false
+            label: 'Reliability Score (%)',
+            data: this.registeredUsers.map(m => m.reliabilityScore || 100),
+            backgroundColor: primaryColor,
+            borderRadius: 6,
+            barThickness: 28
           }]
         },
         options: {
@@ -452,12 +943,12 @@ Sarah Jenkins (VP Tech, Apex Financial)</div>
             y: {
               min: 70,
               max: 100,
-              ticks: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans' } },
-              grid: { color: 'rgba(255,255,255,0.06)' }
+              grid: { color: gridColor },
+              ticks: { color: textColor, font: { family: 'JetBrains Mono' } }
             },
             x: {
-              ticks: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans', weight: 600 } },
-              grid: { display: false }
+              grid: { display: false },
+              ticks: { color: textColor, font: { family: 'Plus Jakarta Sans' } }
             }
           },
           plugins: {
@@ -468,47 +959,254 @@ Sarah Jenkins (VP Tech, Apex Financial)</div>
     }
   }
 
-  setupRoiCalculator() {
-    const empSlider = document.getElementById('roiEmployeesSlider');
-    const forgSlider = document.getElementById('roiForgottenSlider');
+  renderTeamMembers() {
+    const grid = document.getElementById('teamMembersGrid');
+    if (!grid) return;
 
-    const updateRoi = () => {
-      const emps = parseInt(empSlider.value, 10);
-      const forg = parseInt(forgSlider.value, 10);
+    grid.innerHTML = this.registeredUsers.map(m => `
+      <div class="team-member-card">
+        <div class="avatar-initials" style="width: 38px; height: 38px; font-size: 0.85rem;">${m.avatar || 'ST'}</div>
+        <div style="flex: 1; overflow: hidden;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
+            <strong style="font-size: 0.88rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${m.name}</strong>
+            <span class="badge ${m.isAdmin ? 'badge-primary' : 'badge-confidence'}" style="font-size: 0.65rem;">${m.isAdmin ? 'ADMIN' : 'EMPLOYEE'}</span>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--color-primary); font-family: var(--font-mono); margin-top: 2px;">${m.email}</div>
+          <div style="font-size: 0.72rem; color: var(--text-muted);">${m.role} • ${m.department || 'Operations'}</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.35rem;">
+          <button class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 0.7rem;" onclick="window.commitPulseApp.fillCredentials('${m.email}', '${m.password || (m.isAdmin ? 'admin123' : 'employee123')}')" title="Autofill Login Credentials">
+            Autofill
+          </button>
+          ${!m.isAdmin ? `
+            <button class="btn btn-danger btn-sm" style="padding: 2px 7px; font-size: 0.7rem;" onclick="window.commitPulseApp.deleteEmployee('${m.id}')" title="Delete Employee Account">
+              Delete
+            </button>
+          ` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
 
-      document.getElementById('roiEmployeesCount').textContent = emps;
-      document.getElementById('roiForgottenCount').textContent = forg;
+  deleteEmployee(userId) {
+    if (this.currentUser && !this.currentUser.isAdmin && this.currentUser.role !== 'Administrator') {
+      this.showToast('Administrator privileges required to delete employee accounts.');
+      return;
+    }
 
-      const monthlySaved = emps * forg * 750; // ~₹750 value per preserved commitment / deadline
-      document.getElementById('roiSavedAmount').textContent = `₹${monthlySaved.toLocaleString('en-IN')}`;
-    };
+    const userToDelete = this.registeredUsers.find(u => u.id === userId);
+    if (!userToDelete) return;
 
-    if (empSlider && forgSlider) {
-      empSlider.addEventListener('input', updateRoi);
-      forgSlider.addEventListener('input', updateRoi);
-      updateRoi();
+    if (userToDelete.isAdmin || userToDelete.role === 'Administrator') {
+      this.showToast('Cannot delete the root Administrator account.');
+      return;
+    }
+
+    this.registeredUsers = this.registeredUsers.filter(u => u.id !== userId);
+    this.saveUsers();
+    this.populateTeamDropdowns();
+    this.renderTeamMembers();
+    this.renderAnalytics();
+    this.updateDashboardKPIs();
+    this.showToast(`Deleted employee account for ${userToDelete.name} (${userToDelete.email})`);
+  }
+
+  renderAuditHistory() {
+    const tbody = document.getElementById('auditHistoryTableBody');
+    if (!tbody || !this.taskManager) return;
+
+    const history = this.taskManager.getAuditHistory();
+    if (history.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">No audit records logged yet.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = history.map(item => `
+      <tr>
+        <td style="font-family: var(--font-mono); font-size: 0.78rem;">${item.timestamp}</td>
+        <td><strong>[${item.taskId}]</strong> ${item.title}</td>
+        <td>${item.owner}</td>
+        <td>${item.sourceType} (${item.sourceChannel})</td>
+        <td><span class="badge" style="background: var(--color-primary-light); color: var(--color-primary);">${item.action}</span></td>
+      </tr>
+    `).join('');
+  }
+
+  populateTeamDropdowns() {
+    const taskOwnerSelect = document.getElementById('taskOwnerFilter');
+    const delegateSelect = document.getElementById('delegateMemberSelect');
+
+    if (taskOwnerSelect) {
+      taskOwnerSelect.innerHTML = '<option value="all">All Team Members</option>';
+      this.registeredUsers.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.name;
+        opt.textContent = `${m.name} (${m.role})`;
+        taskOwnerSelect.appendChild(opt);
+      });
+    }
+
+    if (delegateSelect) {
+      delegateSelect.innerHTML = '';
+      this.registeredUsers.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.name;
+        opt.textContent = `${m.name} (${m.role})`;
+        delegateSelect.appendChild(opt);
+      });
     }
   }
 
-  // Confirm / Dismiss Handlers from AI Inbox
-  confirmCommitment(id) {
-    this.inboxManager.confirmCommitment(id);
+  openAddMemberModal() {
+    document.getElementById('addMemberModal')?.classList.add('active');
   }
 
-  dismissCommitment(id) {
-    this.inboxManager.dismissCommitment(id);
+  closeAddMemberModal() {
+    document.getElementById('addMemberModal')?.classList.remove('active');
   }
 
-  // Edit Modal Handlers
-  openEditCommitmentModal(id) {
-    const c = this.inboxManager.getCommitments().find(item => item.id === id);
-    if (!c) return;
+  createEmployeeAccount({ name, email, password, role, dept }) {
+    if (!name || !email) {
+      this.showToast('Please enter employee name and email ID');
+      return;
+    }
 
-    document.getElementById('editCommitmentId').value = c.id;
-    document.getElementById('editCommitmentTitle').value = c.taskTitle;
-    document.getElementById('editCommitmentOwner').value = c.owner;
-    document.getElementById('editCommitmentDeadline').value = c.deadline;
-    document.getElementById('editCommitmentPriority').value = c.priority;
+    const exists = this.registeredUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+    if (exists) {
+      this.showToast(`Account with email ${email} already exists.`);
+      return;
+    }
+
+    const avatar = name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) || 'EM';
+    const newMember = {
+      id: `user-${Date.now()}`,
+      email,
+      password: password || 'employee123',
+      name,
+      role: role || 'Software Engineer',
+      avatar,
+      department: dept || 'Engineering',
+      isAdmin: false,
+      activeTasks: 0,
+      reliabilityScore: 100
+    };
+
+    this.registeredUsers.push(newMember);
+    this.saveUsers();
+    this.populateTeamDropdowns();
+    this.renderTeamMembers();
+    this.renderAnalytics();
+    this.updateDashboardKPIs();
+    this.showToast(`Created account for ${name} (${email}). Password: ${newMember.password}`);
+  }
+
+  saveAddMember() {
+    const name = document.getElementById('newMemberName')?.value.trim();
+    const email = document.getElementById('newMemberEmail')?.value.trim().toLowerCase();
+    const password = document.getElementById('newMemberPassword')?.value.trim() || 'employee123';
+    const role = document.getElementById('newMemberRole')?.value.trim() || 'Software Engineer';
+    const dept = document.getElementById('newMemberDept')?.value.trim() || 'Engineering';
+
+    this.createEmployeeAccount({ name, email, password, role, dept });
+    this.closeAddMemberModal();
+
+    document.getElementById('newMemberName').value = '';
+    document.getElementById('newMemberEmail').value = '';
+    document.getElementById('newMemberPassword').value = '';
+    document.getElementById('newMemberRole').value = '';
+    document.getElementById('newMemberDept').value = '';
+  }
+
+  setupRoiCalculator() {
+    const empSlider = document.getElementById('roiEmployeesSlider');
+    const forgSlider = document.getElementById('roiForgottenSlider');
+    const empCount = document.getElementById('roiEmployeesCount');
+    const forgCount = document.getElementById('roiForgottenCount');
+    const savedAmount = document.getElementById('roiSavedAmount');
+    const hoursDesc = document.getElementById('roiHoursDesc');
+
+    const updateRoi = () => {
+      if (!empSlider || !forgSlider) return;
+      const employees = parseInt(empSlider.value, 10);
+      const forgotten = parseInt(forgSlider.value, 10);
+
+      if (empCount) empCount.textContent = employees;
+      if (forgCount) forgCount.textContent = forgotten;
+
+      const monthlyHoursSaved = employees * forgotten * 1.5;
+      const financialSavedINR = Math.round(monthlyHoursSaved * 500);
+
+      if (savedAmount) {
+        savedAmount.textContent = `₹${financialSavedINR.toLocaleString('en-IN')} Saved`;
+      }
+      if (hoursDesc) {
+        hoursDesc.textContent = `Based on ~${employees * forgotten} dropped commitments prevented and ~${Math.round(monthlyHoursSaved)} follow-up hours saved per month.`;
+      }
+    };
+
+    empSlider?.addEventListener('input', updateRoi);
+    forgSlider?.addEventListener('input', updateRoi);
+  }
+
+  openIngestModal() {
+    document.getElementById('ingestModal')?.classList.add('active');
+  }
+
+  closeIngestModal() {
+    document.getElementById('ingestModal')?.classList.remove('active');
+  }
+
+  async handleCustomIngest() {
+    const source = document.getElementById('customIngestSource')?.value || 'Meeting Transcript';
+    const channel = document.getElementById('customIngestChannel')?.value || 'Architecture Review Sync';
+    const text = document.getElementById('customIngestText')?.value || '';
+
+    if (!text.trim()) {
+      this.showToast('Please paste transcript or discussion text');
+      return;
+    }
+
+    this.closeIngestModal();
+    this.showToast('Analyzing stream with Meetpulse NLP Engine...');
+
+    const senderName = this.currentUser ? this.currentUser.name : 'Team Member';
+
+    const extracted = await this.commitmentEngine.analyzeCommunication({
+      text,
+      sourceType: source,
+      sourceChannel: channel,
+      sender: senderName
+    });
+
+    const newStream = {
+      id: `stream-${Date.now()}`,
+      channelName: channel,
+      sourceType: source,
+      sender: senderName,
+      senderAvatar: this.currentUser ? this.currentUser.avatar : 'MS',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      rawContent: text,
+      detectedCommitments: extracted
+    };
+
+    this.communicationStreams.unshift(newStream);
+    this.inboxManager.addCommitments(extracted);
+
+    this.loadChannel(0);
+    this.showToast(`Extracted ${extracted.length} action items added to Action Queue`);
+    this.switchView('view-chat');
+  }
+
+  openEditCommitmentModal(commitmentId) {
+    const commitments = this.inboxManager.getCommitments();
+    const item = commitments.find(c => c.id === commitmentId) || this.inchatCommitmentsMap.get(commitmentId);
+    if (!item) return;
+
+    document.getElementById('editCommitmentId').value = item.id;
+    document.getElementById('editCommitmentTitle').value = item.taskTitle;
+    document.getElementById('editCommitmentOwner').value = item.owner;
+    document.getElementById('editCommitmentDeadline').value = item.deadline;
+    document.getElementById('editCommitmentPriority').value = item.priority;
 
     document.getElementById('editCommitmentModal')?.classList.add('active');
   }
@@ -519,26 +1217,27 @@ Sarah Jenkins (VP Tech, Apex Financial)</div>
 
   saveEditCommitment() {
     const id = document.getElementById('editCommitmentId').value;
-    const taskTitle = document.getElementById('editCommitmentTitle').value;
+    const title = document.getElementById('editCommitmentTitle').value;
     const owner = document.getElementById('editCommitmentOwner').value;
     const deadline = document.getElementById('editCommitmentDeadline').value;
     const priority = document.getElementById('editCommitmentPriority').value;
 
-    this.inboxManager.updateCommitment({
-      id,
-      taskTitle,
-      owner,
-      deadline,
-      priority
-    });
+    const commitments = this.inboxManager.getCommitments();
+    const item = commitments.find(c => c.id === id);
+    if (item) {
+      item.taskTitle = title;
+      item.owner = owner;
+      item.deadline = deadline;
+      item.priority = priority;
+      this.inboxManager.render();
+    }
 
     this.closeEditCommitmentModal();
-    this.showToast('✅ Updated commitment details!');
+    this.showToast(`Updated deliverable: "${title}"`);
   }
 
-  // Delegate Modal Handlers
-  openDelegateModal(id) {
-    document.getElementById('delegateCommitmentId').value = id;
+  openDelegateModal(commitmentId) {
+    document.getElementById('delegateCommitmentId').value = commitmentId;
     document.getElementById('delegateModal')?.classList.add('active');
   }
 
@@ -548,74 +1247,34 @@ Sarah Jenkins (VP Tech, Apex Financial)</div>
 
   saveDelegation() {
     const id = document.getElementById('delegateCommitmentId').value;
-    const newOwnerName = document.getElementById('delegateMemberSelect').value;
-    const member = this.teamMembers.find(m => m.name === newOwnerName) || { avatar: '👤', role: 'Team Member' };
+    const newOwner = document.getElementById('delegateMemberSelect').value;
 
-    this.inboxManager.updateCommitment({
-      id,
-      owner: newOwnerName,
-      ownerAvatar: member.avatar,
-      ownerRole: member.role
-    });
-
-    this.closeDelegateModal();
-    this.showToast(`🔄 Delegated commitment to @${newOwnerName}`);
-  }
-
-  // Custom Ingest Modal Handlers
-  openIngestModal() {
-    document.getElementById('ingestModal')?.classList.add('active');
-  }
-
-  closeIngestModal() {
-    document.getElementById('ingestModal')?.classList.remove('active');
-  }
-
-  async handleCustomIngest() {
-    const sourceType = document.getElementById('customIngestSource').value;
-    const sourceChannel = document.getElementById('customIngestChannel').value || "General Feed";
-    const text = document.getElementById('customIngestText').value;
-
-    if (!text.trim()) {
-      this.showToast('⚠️ Please enter communication text.');
-      return;
+    const commitments = this.inboxManager.getCommitments();
+    const item = commitments.find(c => c.id === id);
+    if (item) {
+      item.owner = newOwner;
+      const tm = this.registeredUsers.find(m => m.name === newOwner);
+      if (tm) item.ownerAvatar = tm.avatar;
+      this.inboxManager.render();
     }
 
-    this.closeIngestModal();
-    this.showToast('✨ NLP engine scanning communication for commitments...');
-
-    const extracted = await this.commitmentEngine.analyzeCommunication({
-      text,
-      sourceType,
-      sourceChannel,
-      sender: "Team Member"
-    });
-
-    this.inboxManager.addCommitments(extracted);
-    this.showToast(`🎉 Detected ${extracted.length} commitments in AI Inbox!`);
-    document.querySelector('[data-tab="tab-inbox"]')?.click();
+    this.closeDelegateModal();
+    this.showToast(`Reassigned deliverable to ${newOwner}`);
   }
 
-  // Trigger Demo Simulator
-  triggerDemoSim() {
-    const randomComm = PRELOADED_COMMS[Math.floor(Math.random() * PRELOADED_COMMS.length)];
-    this.inboxManager.addCommitments(randomComm.detectedCommitments);
-    this.showToast(`📥 Ingested commitments from ${randomComm.channelName}!`);
-  }
-
-  // Task Details Modal Handlers
   openTaskModal(taskId) {
-    const task = this.taskManager.getTasks().find(t => t.id === taskId);
+    const tasks = this.taskManager.getTasks();
+    const task = tasks.find(t => t.id === taskId);
     if (!task) return;
 
-    document.getElementById('taskDetailModalTitle').textContent = `Task Details: ${task.id}`;
     document.getElementById('modalTaskId').value = task.id;
     document.getElementById('modalTaskTitle').value = task.title;
     document.getElementById('modalTaskOwner').value = task.owner;
     document.getElementById('modalTaskStatus').value = task.status;
     document.getElementById('modalTaskDeadline').value = task.deadline;
-    document.getElementById('modalTaskOriginalSnippet').textContent = task.originalSnippet || "Directly confirmed task.";
+    document.getElementById('modalTaskOriginalSnippet').textContent = `"${task.originalSnippet}" — from ${task.sourceType} (${task.sourceChannel})`;
 
+    document.getElementById('taskDetailModalTitle').textContent = `Deliverable Details [${task.id}]`;
     document.getElementById('taskDetailModal')?.classList.add('active');
   }
 
@@ -630,109 +1289,52 @@ Sarah Jenkins (VP Tech, Apex Financial)</div>
     const status = document.getElementById('modalTaskStatus').value;
     const deadline = document.getElementById('modalTaskDeadline').value;
 
-    this.taskManager.updateTask({
-      id,
-      title,
-      owner,
-      status,
-      deadline
-    });
-
+    this.taskManager.updateTask({ id, title, owner, status, deadline });
     this.closeTaskModal();
-    this.showToast(`✅ Updated Task ${id}`);
+    this.showToast(`Updated deliverable [${id}]`);
   }
 
   deleteTaskModal() {
     const id = document.getElementById('modalTaskId').value;
-    if (confirm(`Delete task ${id}?`)) {
-      this.taskManager.deleteTask(id);
-      this.closeTaskModal();
-      this.showToast(`🗑️ Deleted task ${id}`);
-    }
+    this.taskManager.deleteTask(id);
+    this.closeTaskModal();
+    this.showToast(`Deleted deliverable [${id}]`);
   }
 
   openNewTaskModal() {
-    const newId = `TASK-${Math.floor(100 + Math.random() * 900)}`;
+    const id = `TASK-${Math.floor(100 + Math.random() * 900)}`;
+    const creatorName = this.currentUser ? this.currentUser.name : 'Team Member';
+    const creatorAvatar = this.currentUser ? this.currentUser.avatar : 'TM';
+    const creatorRole = this.currentUser ? this.currentUser.role : 'Staff Member';
+
     const newTask = {
-      id: newId,
-      title: "New Manual Action Item",
-      owner: this.teamMembers[0].name,
-      ownerAvatar: this.teamMembers[0].avatar,
-      ownerRole: this.teamMembers[0].role,
-      requester: "Manual Entry",
-      deadline: "Friday, 5:00 PM",
-      priority: "Medium",
-      status: "todo",
-      sourceType: "Direct",
-      sourceChannel: "Manual",
-      originalSnippet: "Directly added commitment.",
+      id,
+      title: 'New Project Deliverable',
+      owner: creatorName,
+      ownerAvatar: creatorAvatar,
+      ownerRole: creatorRole,
+      requester: 'Manual Entry',
+      deadline: 'Tomorrow, 5:00 PM',
+      deadlineISO: new Date(Date.now() + 86400000).toISOString(),
+      priority: 'High',
+      status: 'todo',
+      sourceType: 'Direct Entry',
+      sourceChannel: 'Workspace Dashboard',
+      originalSnippet: 'Created manually by team member.',
       confidence: 100,
       confirmedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isForgottenRisk: false
+      isForgottenRisk: false,
+      notes: 'Directly added from deliverable manager.'
     };
 
     this.taskManager.addTask(newTask);
-    this.showToast(`✅ Created Task ${newId}`);
-    this.openTaskModal(newId);
+    this.openTaskModal(id);
   }
 
-  // Kanban Drag and Drop
-  handleDragStart(event, taskId) {
-    this.draggedTaskId = taskId;
-    event.dataTransfer.setData('text/plain', taskId);
-  }
-
-  handleDrop(event, columnId) {
-    event.preventDefault();
-    document.querySelectorAll('.kanban-column').forEach(c => c.classList.remove('drag-over'));
-    if (this.draggedTaskId) {
-      this.taskManager.moveTaskStatus(this.draggedTaskId, columnId);
-      this.showToast(`📋 Moved ${this.draggedTaskId} to ${columnId.toUpperCase()}`);
-      this.draggedTaskId = null;
-    }
-  }
-
-  // Slack Nudge Reminder Simulation
-  sendNudge(taskId) {
-    const task = this.taskManager.getTasks().find(t => t.id === taskId);
-    if (!task) return;
-
-    this.showToast(`🔔 Slack Reminder sent to @${task.owner}: "Reminder: '${task.title}' is due ${task.deadline}."`);
-  }
-
-  // Export Audit CSV
-  exportAuditCSV() {
-    const history = this.taskManager.getAuditHistory();
-    const headers = ["Timestamp", "Task ID", "Summary", "Owner", "Source Channel", "Action"];
-    const rows = history.map(h => [
-      `"${h.timestamp}"`,
-      `"${h.taskId}"`,
-      `"${(h.title || '').replace(/"/g, '""')}"`,
-      `"${h.owner}"`,
-      `"${h.sourceType} (${h.sourceChannel})"`,
-      `"${h.action}"`
-    ]);
-
-    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `commitpulse_audit_log_${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 200);
-
-    this.showToast('⬇️ Downloaded Audit Trail CSV');
-  }
-
-  // AI Settings Modal
   openSettingsModal() {
-    const keyInput = document.getElementById('geminiApiKeyInput');
-    if (keyInput) keyInput.value = this.commitmentEngine.getApiKey();
+    const key = this.commitmentEngine.getApiKey();
+    const input = document.getElementById('geminiApiKeyInput');
+    if (input) input.value = key;
     document.getElementById('settingsModal')?.classList.add('active');
   }
 
@@ -741,34 +1343,86 @@ Sarah Jenkins (VP Tech, Apex Financial)</div>
   }
 
   saveSettings() {
-    const key = document.getElementById('geminiApiKeyInput')?.value || '';
-    this.commitmentEngine.setApiKey(key);
+    const input = document.getElementById('geminiApiKeyInput');
+    if (input) {
+      this.commitmentEngine.setApiKey(input.value);
+    }
     this.closeSettingsModal();
-    this.showToast(key ? '✅ Gemini API Key Saved!' : 'ℹ️ Using Built-in NLP Engine');
+    this.showToast('Settings saved successfully');
   }
 
-  // Toast Notification
+  exportAuditCSV() {
+    const history = this.taskManager.getAuditHistory();
+    let csv = 'Timestamp,Task ID,Title,Owner,Source Type,Source Channel,Action\n';
+    history.forEach(h => {
+      csv += `"${h.timestamp}","${h.taskId}","${h.title.replace(/"/g, '""')}","${h.owner}","${h.sourceType}","${h.sourceChannel}","${h.action}"\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `meetpulse_audit_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    this.showToast('Audit log exported (CSV)');
+  }
+
+  confirmCommitment(id) {
+    return this.inboxManager.confirmCommitment(id);
+  }
+
+  dismissCommitment(id) {
+    return this.inboxManager.dismissCommitment(id);
+  }
+
+  handleDragStart(e, taskId) {
+    this.draggedTaskId = taskId;
+    e.dataTransfer.setData('text/plain', taskId);
+  }
+
+  handleDrop(e, status) {
+    e.preventDefault();
+    document.querySelectorAll('.kanban-column').forEach(col => col.classList.remove('drag-over'));
+    const taskId = e.dataTransfer.getData('text/plain') || this.draggedTaskId;
+    if (taskId) {
+      this.taskManager.moveTaskStatus(taskId, status);
+      this.showToast(`Moved [${taskId}] to ${status.toUpperCase()}`);
+    }
+  }
+
+  sendNudge(taskId) {
+    const task = this.taskManager.getTasks().find(t => t.id === taskId);
+    const owner = task ? task.owner : 'Team Member';
+    this.sendSlackNudge(taskId, owner);
+  }
+
   showToast(message) {
     const container = document.getElementById('toastContainer');
     if (!container) return;
 
     const toast = document.createElement('div');
-    toast.className = 'toast-item';
+    toast.className = 'toast-msg';
     toast.textContent = message;
-    container.appendChild(toast);
 
+    container.appendChild(toast);
     setTimeout(() => {
       toast.style.opacity = '0';
-      toast.style.transform = 'translateY(16px) scale(0.95)';
-      toast.style.transition = 'all 0.3s ease-out';
-      setTimeout(() => {
-        if (toast.parentNode) container.removeChild(toast);
-      }, 300);
+      toast.style.transform = 'translateY(12px) scale(0.96)';
+      toast.style.transition = 'all 0.3s ease';
+      setTimeout(() => toast.remove(), 300);
     }, 3200);
+  }
+
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 }
 
-// Start Application on Load
 document.addEventListener('DOMContentLoaded', () => {
-  new CommitPulseApp();
+  new MeetPulseApp();
 });

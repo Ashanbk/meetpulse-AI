@@ -2,532 +2,775 @@
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CommitPulse AI — AI That Finds the Work Hiding Inside Your Conversations</title>
-  <meta name="description" content="Dedicated AI commitment-detection layer that finds hidden work inside Slack, Email, and Meeting transcripts before it gets lost.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Meetpulse — AI Meeting & Commitment Intelligence</title>
+  <meta name="description" content="Meetpulse automatically detects commitments, promises, and deliverables from meetings and team communications.">
   <link rel="stylesheet" href="css/styles.css">
-  <!-- Chart.js for Team Reliability & Conversion Visualizations -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
-  <div class="app-container">
-    <!-- Master Header -->
-    <header class="app-header">
-      <div class="brand-section">
-        <div class="brand-logo-wrap">
-          <div class="brand-logo">⚡</div>
-        </div>
-        <div class="brand-name-group">
-          <div class="brand-name">
-            CommitPulse <span style="font-size: 0.75rem; padding: 2px 7px; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); border-radius: var(--radius-full); color: var(--color-primary); font-family: var(--font-mono); font-weight: 700;">AI 2.0</span>
+  <!-- Mobile Sidebar Backdrop Overlay -->
+  <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
+
+  <!-- ==========================================================================
+       AUTHENTICATION / LOGIN OVERLAY (PASSWORD-PROTECTED SIGN-IN)
+       ========================================================================== -->
+  <div id="authOverlay" class="modal-overlay active" style="z-index: 2000;">
+    <div class="modal-dialog" style="max-width: 480px;">
+      <div style="padding: 2.25rem 2rem 1.75rem 2rem; text-align: center;">
+        <div class="brand-icon-box" style="width: 48px; height: 48px; font-size: 1.25rem; margin: 0 auto 1.25rem auto;">MP</div>
+        <h2 style="font-family: var(--font-heading); font-size: 1.5rem; font-weight: 800; color: var(--text-primary);">Meetpulse Workspace</h2>
+        <p style="font-size: 0.86rem; color: var(--text-secondary); margin-top: 0.35rem;">
+          Secure password-protected sign in for Administrators and Employees.
+        </p>
+
+        <!-- Main Password-Protected Login Form -->
+        <form id="secureLoginForm" style="text-align: left; margin: 1.5rem 0 1rem 0; display: flex; flex-direction: column; gap: 0.85rem;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Work Email ID</label>
+            <input type="email" id="loginEmailInput" class="form-input" placeholder="admin@meetpulse.ai or employee@company.com" required>
           </div>
-          <div class="brand-tagline">AI that finds the work hiding inside your conversations</div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" style="display: flex; justify-content: space-between;">
+              <span>Password</span>
+              <span id="passwordHint" style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">Encrypted</span>
+            </label>
+            <div class="password-input-wrapper">
+              <input type="password" id="loginPasswordInput" class="form-input" placeholder="Enter your password" required>
+              <button type="button" id="toggleLoginPasswordBtn" class="password-toggle-btn" title="Toggle password visibility">
+                <svg class="icon-svg" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.75rem; font-size: 0.9rem; font-weight: 700; margin-top: 0.25rem;">
+            Sign In with Password
+          </button>
+        </form>
+
+        <div id="loginErrorMessage" style="display: none; padding: 0.65rem 0.85rem; border-radius: var(--radius-xs); background: var(--color-danger-light); border: 1px solid rgba(239,68,68,0.35); color: var(--color-danger); font-size: 0.8rem; margin-bottom: 1rem; text-align: left;">
+          <!-- Injected via JS -->
+        </div>
+
+        <!-- Quick Fill Credentials / Registered Accounts -->
+        <div id="quickCredentialsDeck" style="background: var(--bg-subtle); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 0.85rem; text-align: left; margin-bottom: 1rem;">
+          <div style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 800; margin-bottom: 0.45rem; letter-spacing: 0.05em; display: flex; align-items: center; justify-content: space-between;">
+            <span>Default / Registered Credentials:</span>
+            <span style="color: var(--color-primary); font-size: 0.68rem;">1-Click Autofill</span>
+          </div>
+
+          <!-- Admin Quick Preset -->
+          <div class="team-member-card" style="padding: 0.45rem 0.65rem; cursor: pointer; background: var(--bg-card); margin-bottom: 0.4rem;" onclick="window.commitPulseApp.fillCredentials('admin@meetpulse.ai', 'admin123')">
+            <span class="avatar-initials avatar-sm">AD</span>
+            <div style="flex: 1; overflow: hidden;">
+              <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary);">Administrator</div>
+              <div style="font-size: 0.72rem; color: var(--text-secondary); font-family: var(--font-mono);">admin@meetpulse.ai • admin123</div>
+            </div>
+            <span style="font-size: 0.7rem; color: var(--color-primary); font-weight: 700;">Fill →</span>
+          </div>
+
+          <div id="employeePresetsList" style="display: flex; flex-direction: column; gap: 0.4rem; max-height: 110px; overflow-y: auto;">
+            <!-- Dynamically populated employees -->
+          </div>
+        </div>
+
+        <button id="quickCreateEmpFromLoginBtn" class="btn btn-sm" style="width: 100%; color: var(--color-primary); background: transparent; border: none; font-weight: 700; cursor: pointer;">
+          + Need to create an employee account? Click here
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-layout">
+    <!-- ==========================================================================
+         MEETPULSE LEFT SIDEBAR
+         ========================================================================== -->
+    <aside class="app-sidebar" id="appSidebar">
+      <!-- Sidebar Header & Brand -->
+      <div class="sidebar-header">
+        <div class="sidebar-brand" id="brandHomeTrigger">
+          <div class="brand-icon-box">MP</div>
+          <div class="brand-info">
+            <div class="brand-title">
+              Meetpulse <span class="brand-tag">AI</span>
+            </div>
+            <div class="brand-subtitle">Commitment Intelligence</div>
+          </div>
         </div>
       </div>
 
-      <!-- Main Navigation Tabs -->
-      <nav class="main-nav-tabs">
-        <button class="nav-tab-btn active" data-tab="tab-dashboard" id="navTabDashboard">
-          📊 Dashboard
+      <!-- Quick Action: Ingest Meeting & Create Employee -->
+      <div class="sidebar-quick-action">
+        <button id="openIngestModalBtn" class="btn-new-ingest">
+          <span>Ingest Communication</span>
         </button>
-        <button class="nav-tab-btn" data-tab="tab-inbox" id="navTabInbox">
-          📥 AI Inbox <span class="nav-badge" id="navInboxBadge">4</span>
-        </button>
-        <button class="nav-tab-btn" data-tab="tab-tasks" id="navTabTasks">
-          📋 My Tasks <span class="nav-badge" id="navTasksBadge" style="background: var(--color-accent); color: #070a13;">5</span>
-        </button>
-        <button class="nav-tab-btn" data-tab="tab-history" id="navTabHistory">
-          📜 History & Audit
-        </button>
-        <button class="nav-tab-btn" data-tab="tab-analytics" id="navTabAnalytics">
-          📈 Team Analytics
-        </button>
-        <button class="nav-tab-btn" data-tab="tab-pricing" id="navTabPricing">
-          💎 SaaS Pricing
-        </button>
-      </nav>
-
-      <div class="header-actions">
-        <!-- Live Status Pill -->
-        <div class="system-status-pill">
-          <span class="status-dot-pulse"></span>
-          <span>NLP Engine Active</span>
-        </div>
-
-        <!-- Quick Ingest Button -->
-        <button id="openIngestModalBtn" class="btn btn-primary btn-sm">
-          ➕ Ingest Comms
-        </button>
-
-        <!-- Theme Toggle -->
-        <button id="themeToggleBtn" class="btn btn-icon" title="Toggle Light/Dark Theme">
-          🌓
-        </button>
-
-        <!-- Settings Button -->
-        <button id="openSettingsBtn" class="btn btn-icon" title="Configure AI Engine & Gemini API">
-          ⚙️
+        <button id="openAddMemberSidebarBtn" class="btn-create-emp-sidebar" title="Create New Employee Account">
+          <span>+ Create Employee</span>
         </button>
       </div>
-    </header>
 
-    <!-- Main Content Container -->
-    <main class="main-content">
-
-      <!-- Forgotten-Work Radar Alert Banner -->
-      <div id="forgottenRadarBanner" class="forgotten-radar-banner" style="display: none;">
-        <!-- Injected via TaskManager -->
-      </div>
-
-      <!-- TAB 1: DASHBOARD -->
-      <section id="tab-dashboard" class="tab-pane active">
+      <!-- Sidebar Body: Channels & Navigation -->
+      <div class="sidebar-body">
         
-        <!-- KPI Stat Widgets Deck -->
-        <div class="stats-deck-grid">
-          <div class="stat-card">
-            <div class="stat-icon-wrap icon-detected">🔍</div>
-            <div>
-              <div class="stat-val" id="statDetectedCount">12</div>
-              <div class="stat-lbl">Detected Promises</div>
-            </div>
-          </div>
-
-          <div class="stat-card">
-            <div class="stat-icon-wrap icon-pending">📥</div>
-            <div>
-              <div class="stat-val" id="statPendingCount">4</div>
-              <div class="stat-lbl">Pending Confirmation</div>
-            </div>
-          </div>
-
-          <div class="stat-card">
-            <div class="stat-icon-wrap icon-active">📋</div>
-            <div>
-              <div class="stat-val" id="statActiveCount">5</div>
-              <div class="stat-lbl">Active Tracked Tasks</div>
-            </div>
-          </div>
-
-          <div class="stat-card">
-            <div class="stat-icon-wrap icon-risk">⚠️</div>
-            <div>
-              <div class="stat-val" id="statRisksCount">2</div>
-              <div class="stat-lbl">Forgotten-Work Risks</div>
-            </div>
-          </div>
-
-          <div class="stat-card">
-            <div class="stat-icon-wrap icon-score">🛡️</div>
-            <div>
-              <div class="stat-val" id="statReliabilityScore">94.2%</div>
-              <div class="stat-lbl">Team Reliability Index</div>
-            </div>
-          </div>
+        <!-- Channels Section -->
+        <div>
+          <div class="nav-section-label">Communication Streams</div>
+          <ul class="sidebar-nav-list" id="channelList">
+            <li class="sidebar-item active" data-channel-idx="0">
+              <div class="sidebar-item-left">
+                <span class="channel-tag-icon">MS</span>
+                <span class="sidebar-item-label" id="sidebarChannelLabel0">Active Meeting Stream</span>
+              </div>
+              <span class="sidebar-badge badge-primary" id="badgeChannel0">0</span>
+            </li>
+            <li class="sidebar-item" data-channel-idx="1">
+              <div class="sidebar-item-left">
+                <span class="channel-tag-icon">MP</span>
+                <span class="sidebar-item-label">Meetpulse Copilot</span>
+              </div>
+              <span class="sidebar-badge badge-primary" style="font-size: 0.65rem;">AI</span>
+            </li>
+          </ul>
         </div>
 
-        <!-- Live Ingest & Communication Simulator Deck -->
-        <div class="simulator-hero-card" style="margin-top: 1.5rem;">
-          <div class="simulator-header">
-            <div>
-              <h3 style="font-family: var(--font-heading); font-size: 1.3rem; font-weight: 800; color: var(--text-primary);">
-                🛰️ Everyday Communication Listener & Simulator
-              </h3>
-              <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 3px;">
-                Select a connected corporate channel to simulate NLP commitment extraction or paste custom text.
+        <!-- Workspaces Section -->
+        <div>
+          <div class="nav-section-label">Workspaces</div>
+          <ul class="sidebar-nav-list">
+            <li class="sidebar-item active" data-view="view-chat" id="navViewChat">
+              <div class="sidebar-item-left">
+                <span class="sidebar-item-label">Live Stream & Chat</span>
+              </div>
+            </li>
+            <li class="sidebar-item" data-view="view-inbox" id="navViewInbox">
+              <div class="sidebar-item-left">
+                <span class="sidebar-item-label">Action Item Queue</span>
+              </div>
+              <span class="sidebar-badge badge-primary" id="sidebarInboxBadge">0</span>
+            </li>
+            <li class="sidebar-item" data-view="view-tasks" id="navViewTasks">
+              <div class="sidebar-item-left">
+                <span class="sidebar-item-label">Deliverables Board</span>
+              </div>
+              <span class="sidebar-badge badge-primary" id="sidebarTasksBadge">0</span>
+            </li>
+            <li class="sidebar-item" data-view="view-radar" id="navViewRadar">
+              <div class="sidebar-item-left">
+                <span class="sidebar-item-label">Milestone Risk Radar</span>
+              </div>
+              <span class="sidebar-badge" id="sidebarRisksBadge" style="background: rgba(239,68,68,0.15); color: var(--color-danger); border: 1px solid rgba(239,68,68,0.3);">0</span>
+            </li>
+            <li class="sidebar-item" data-view="view-analytics" id="navViewAnalytics">
+              <div class="sidebar-item-left">
+                <span class="sidebar-item-label">Team & Employees</span>
+              </div>
+              <span class="sidebar-badge badge-primary" id="sidebarEmployeesCount">1</span>
+            </li>
+            <li class="sidebar-item" data-view="view-history" id="navViewHistory">
+              <div class="sidebar-item-left">
+                <span class="sidebar-item-label">Audit & Traceability</span>
+              </div>
+            </li>
+            <li class="sidebar-item" data-view="view-pricing" id="navViewPricing">
+              <div class="sidebar-item-left">
+                <span class="sidebar-item-label">Plans & ROI (INR)</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+      </div>
+
+      <!-- Sidebar Footer / Active User Profile & Sign Out -->
+      <div class="sidebar-footer">
+        <div class="user-profile-widget" id="userProfileTrigger" style="cursor: pointer;" title="Click to switch user or sign out">
+          <div class="user-avatar-initials" id="sidebarUserAvatar">AD</div>
+          <div class="user-meta">
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
+              <span class="user-name" id="sidebarUserName">Administrator</span>
+              <span class="badge" id="sidebarUserRoleBadge" style="font-size: 0.6rem; padding: 0 4px; background: var(--color-primary-light); color: var(--color-primary);">ADMIN</span>
+            </div>
+            <div class="user-role" id="sidebarUserRole">Administrator</div>
+          </div>
+        </div>
+        <div class="sidebar-footer-actions">
+          <button id="switchUserBtn" class="btn-icon" title="Sign Out / Switch Account">
+            <svg class="icon-svg" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          </button>
+          <button id="themeToggleBtn" class="btn-icon" title="Toggle Light / Dark Theme">
+            <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"></circle><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path></svg>
+          </button>
+          <button id="openSettingsBtn" class="btn-icon" title="NLP Engine Settings">
+            <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ==========================================================================
+         MAIN VIEWPORT
+         ========================================================================== -->
+    <main class="app-main-viewport">
+
+      <!-- ======================================================================
+           VIEW 1: LIVE MEETING STREAM (#view-chat)
+           ====================================================================== -->
+      <section id="view-chat" class="view-pane active">
+        <div class="chat-workspace">
+          
+          <!-- Top Header -->
+          <header class="chat-header-bar">
+            <div class="chat-header-left">
+              <button class="mobile-menu-toggle" id="mobileSidebarToggle" title="Open Navigation Menu">
+                <svg class="icon-svg" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                <span>Menu</span>
+              </button>
+              <div class="channel-status-badge" id="headerChannelIcon">MS</div>
+              <div class="channel-header-details">
+                <div class="channel-title-row">
+                  <span class="channel-name" id="headerChannelTitle">Active Meeting & Stream</span>
+                  <span class="channel-badge-status">
+                    <span class="live-pulse-dot"></span>
+                    <span id="headerChannelType">Real-time NLP</span>
+                  </span>
+                </div>
+                <span class="channel-meta-text" id="headerChannelMeta">Ready to extract commitments, deadlines, and deliverables</span>
+              </div>
+            </div>
+
+            <div class="chat-header-actions">
+              <button id="quickCreateEmpHeaderBtn" class="btn btn-secondary btn-sm" title="Create New Employee Account">
+                + Create Employee
+              </button>
+              <button id="quickInboxBtn" class="btn btn-secondary btn-sm" title="View Action Queue">
+                Queue (<span id="headerInboxCount">0</span>)
+              </button>
+              <button id="openIngestModalHeaderBtn" class="btn btn-primary btn-sm">
+                Ingest Meeting
+              </button>
+            </div>
+          </header>
+
+          <!-- Chat Stream Messages Container -->
+          <div class="chat-stream-container" id="chatStreamContainer">
+            
+            <!-- Hero Welcome Card -->
+            <div class="chat-welcome-hero" id="chatWelcomeHero">
+              <div class="welcome-hero-top">
+                <div>
+                  <h2 class="welcome-hero-title">
+                    <span>Meetpulse Commitment Intelligence</span>
+                  </h2>
+                  <p class="welcome-hero-desc">
+                    Intelligent communication listener that extracts deliverables, assigns owners, tracks deadlines, and ensures zero dropped commitments across meetings, emails, and chats.
+                  </p>
+                </div>
+              </div>
+
+              <div class="welcome-highlights-row">
+                <div class="welcome-stat-pill">
+                  <span>Action Items Detected:</span>
+                  <strong id="statHeroDetected">0</strong>
+                </div>
+                <div class="welcome-stat-pill">
+                  <span>Pending Confirmation:</span>
+                  <strong id="statHeroPending">0</strong>
+                </div>
+                <div class="welcome-stat-pill">
+                  <span>Active Deliverables:</span>
+                  <strong id="statHeroActive">0</strong>
+                </div>
+                <div class="welcome-stat-pill">
+                  <span>Registered Employees:</span>
+                  <strong id="statHeroEmployees">1</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- Dynamic Chat Thread -->
+            <div id="dynamicChatThread">
+              <!-- Rendered dynamically -->
+            </div>
+
+          </div>
+
+          <!-- Prompt Suggestion Chips -->
+          <div class="chat-prompt-suggestions-row">
+            <button class="prompt-chip" id="chipCreateEmployee">
+              + Create Employee ID
+            </button>
+            <button class="prompt-chip" id="chipIngestMeeting">
+              Ingest Meeting Audio / Notes
+            </button>
+            <button class="prompt-chip" id="chipCheckRadar">
+              Check Milestone Deadlines
+            </button>
+            <button class="prompt-chip" id="chipManageEmployees">
+              Team & Employees Roster
+            </button>
+            <button class="prompt-chip" id="chipCustomPromise">
+              Type custom action item...
+            </button>
+          </div>
+
+          <!-- Floating Input Dock -->
+          <div class="chat-input-container">
+            <div class="chat-input-dock">
+              <select id="chatSourceSelect" class="input-source-select" title="Select Context">
+                <option value="Meeting Transcript">Meeting Transcript</option>
+                <option value="Client Email">Client Email</option>
+                <option value="Slack Stream">Slack Stream</option>
+                <option value="Direct Entry">Direct Entry</option>
+              </select>
+
+              <textarea 
+                id="chatInputText" 
+                class="chat-textarea" 
+                rows="1" 
+                placeholder="Type an action item, ask Meetpulse Copilot, or paste transcript notes (e.g. 'Please deploy the database backup script by Friday 5 PM')..."
+              ></textarea>
+
+              <button id="chatSendBtn" class="chat-send-btn" title="Send & scan for commitments">
+                <span>Scan & Submit</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ======================================================================
+           VIEW 2: ACTION ITEM QUEUE (#view-inbox)
+           ====================================================================== -->
+      <section id="view-inbox" class="view-pane">
+        <div class="view-content-wrapper">
+          <div class="view-header">
+            <div class="view-title-group">
+              <h2 class="view-title">Action Item Queue — Review & Approval</h2>
+              <p class="view-desc">
+                Review commitments detected in meetings and communication threads. Only approved deliverables enter the official sprint board.
               </p>
             </div>
 
-            <div class="channels-preset-row">
-              <button class="channel-btn active" data-channel="slack">
-                💬 Slack (#product-launch)
-              </button>
-              <button class="channel-btn" data-channel="email">
-                ✉️ Gmail (Apex SLA Contract)
-              </button>
-              <button class="channel-btn" data-channel="meeting">
-                🎙️ Zoom (Sprint Architecture)
+            <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+              <select id="inboxSourceFilter" class="form-select">
+                <option value="all">All Communication Channels</option>
+                <option value="meeting transcript">Meeting Transcripts</option>
+                <option value="client email">Client Emails</option>
+                <option value="slack stream">Slack Streams</option>
+              </select>
+
+              <select id="inboxConfidenceFilter" class="form-select">
+                <option value="all">All Confidence Scores</option>
+                <option value="high">High Confidence (90%+)</option>
+                <option value="medium">Medium Confidence (80%+)</option>
+              </select>
+
+              <button id="inboxConfirmAllBtn" class="btn btn-primary btn-sm">
+                Approve All Action Items
               </button>
             </div>
           </div>
 
-          <!-- Channel Preview Window -->
-          <div class="channel-feed-container">
-            <div class="feed-header-bar">
-              <div style="display: flex; align-items: center; gap: 0.6rem;">
-                <span id="activeChannelBadge" style="font-size: 0.85rem; font-weight: 700; color: var(--color-slack);">
-                  💬 Channel: Slack #product-launch
-                </span>
-                <span style="font-size: 0.75rem; background: rgba(16,185,129,0.15); color: var(--color-primary); padding: 2px 8px; border-radius: var(--radius-full); font-weight: 700;">
-                  Live Stream Connected
-                </span>
-              </div>
-              <span id="activeChannelTimestamp" style="font-size: 0.775rem; color: var(--text-muted); font-family: var(--font-mono);">
-                Today, 10:42 AM
-              </span>
-            </div>
-
-            <!-- Styled Rich Content Feed -->
-            <div id="richChannelFeed" class="chat-thread-view">
-              <!-- Rendered dynamically by app.js -->
-            </div>
-          </div>
-
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
-            <div style="font-size: 0.85rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.4rem;">
-              <span>⚡ CommitPulse NLP engine extracts only verified work promises and filters out conversational noise.</span>
-            </div>
-            <button id="runDetectionBtn" class="btn btn-primary">
-              ✨ Scan & Extract Commitments to AI Inbox
-            </button>
+          <div id="inboxContainer" class="inbox-cards-grid">
+            <!-- Rendered by InboxManager -->
           </div>
         </div>
-
-        <!-- End-to-End Flow Infographic Card -->
-        <div class="lifecycle-flow-card">
-          <h3 class="content-card-title">🔄 End-to-End Commitment Lifecycle</h3>
-          <p style="font-size: 0.85rem; color: var(--text-secondary);">How CommitPulse AI transforms casual conversations into zero-loss execution:</p>
-          
-          <div class="lifecycle-flow-grid">
-            <div class="lifecycle-step-card">
-              <div class="lifecycle-step-icon">💬</div>
-              <div class="lifecycle-step-title">1. Daily Comms</div>
-              <div class="lifecycle-step-desc">Emails, chats, and meetings where promises are casually spoken.</div>
-            </div>
-
-            <div class="lifecycle-step-card">
-              <div class="lifecycle-step-icon">🧠</div>
-              <div class="lifecycle-step-title" style="color: var(--color-accent);">2. AI NLP Extraction</div>
-              <div class="lifecycle-step-desc">Extracts action title, owner, deadline, and confidence score.</div>
-            </div>
-
-            <div class="lifecycle-step-card">
-              <div class="lifecycle-step-icon">📥</div>
-              <div class="lifecycle-step-title" style="color: var(--color-warning);">3. Human Confirmation</div>
-              <div class="lifecycle-step-desc">Employee reviews in AI Inbox before it becomes a formal task.</div>
-            </div>
-
-            <div class="lifecycle-step-card">
-              <div class="lifecycle-step-icon">📋</div>
-              <div class="lifecycle-step-title" style="color: var(--color-primary);">4. Tracked Tasks</div>
-              <div class="lifecycle-step-desc">Managed on Kanban board with automated deadline countdowns.</div>
-            </div>
-
-            <div class="lifecycle-step-card">
-              <div class="lifecycle-step-icon">🚨</div>
-              <div class="lifecycle-step-title" style="color: var(--color-danger);">5. Forgotten Radar</div>
-              <div class="lifecycle-step-desc">Proactive alerts before promises slip or get forgotten.</div>
-            </div>
-          </div>
-        </div>
-
       </section>
 
-      <!-- TAB 2: AI INBOX (HUMAN CONFIRMATION QUEUE) -->
-      <section id="tab-inbox" class="tab-pane">
-        <div class="inbox-toolbar">
-          <div>
-            <h2 style="font-family: var(--font-heading); font-size: 1.4rem; font-weight: 800; color: var(--text-primary);">
-              📥 AI Inbox — Pending Human Confirmation
-            </h2>
-            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 2px;">
-              Review detected commitments. Only confirmed commitments enter the official task tracking system.
+      <!-- ======================================================================
+           VIEW 3: DELIVERABLES BOARD (#view-tasks)
+           ====================================================================== -->
+      <section id="view-tasks" class="view-pane">
+        <div class="view-content-wrapper">
+          <div class="view-header">
+            <div class="view-title-group">
+              <h2 class="view-title">Deliverables & Sprint Board</h2>
+              <p class="view-desc">
+                Track confirmed action items, architectural milestones, and client commitments on an interactive Kanban board.
+              </p>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+              <select id="taskOwnerFilter" class="form-select">
+                <option value="all">All Team Members</option>
+              </select>
+
+              <select id="taskPriorityFilter" class="form-select">
+                <option value="all">All Priorities</option>
+                <option value="urgent">Urgent</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+
+              <input type="text" id="taskSearchInput" class="form-input" placeholder="Search deliverables..." style="width: 200px;">
+
+              <button id="viewKanbanBtn" class="btn btn-secondary btn-sm" style="background: var(--color-primary-light); color: var(--color-primary); border-color: var(--border-glow);">
+                Kanban
+              </button>
+              <button id="viewListBtn" class="btn btn-secondary btn-sm">
+                List
+              </button>
+              <button id="addNewTaskManualBtn" class="btn btn-primary btn-sm">
+                Add Deliverable
+              </button>
+            </div>
+          </div>
+
+          <div id="kanbanBoardContainer" class="kanban-grid">
+            <!-- Rendered by TaskManager -->
+          </div>
+
+          <div id="tasksListContainer" style="display: none;" class="content-card">
+            <!-- Rendered by TaskManager -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================================
+           VIEW 4: MILESTONE RISK RADAR (#view-radar)
+           ====================================================================== -->
+      <section id="view-radar" class="view-pane">
+        <div class="view-content-wrapper">
+          <div class="view-header">
+            <div class="view-title-group">
+              <h2 class="view-title">Milestone Risk Radar</h2>
+              <p class="view-desc">
+                Proactive intelligence monitoring approaching deadlines, overdue deliverables, and at-risk commitments.
+              </p>
+            </div>
+          </div>
+
+          <div id="forgottenRadarBanner" class="forgotten-radar-banner">
+            <!-- Injected via TaskManager -->
+          </div>
+
+          <div class="content-card" style="margin-top: 1.5rem;">
+            <h3 class="content-card-title">Pending Deliverables at Risk</h3>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+              These commitments were extracted from meetings and communications with target deadlines approaching or overdue.
             </p>
-          </div>
-
-          <div class="inbox-filters-row">
-            <select id="inboxSourceFilter" class="form-select">
-              <option value="all">🌐 All Channels</option>
-              <option value="slack">💬 Slack</option>
-              <option value="email">✉️ Email</option>
-              <option value="meeting">🎙️ Meeting</option>
-            </select>
-
-            <select id="inboxConfidenceFilter" class="form-select">
-              <option value="all">🎯 All Confidence</option>
-              <option value="high">High Confidence (≥90%)</option>
-              <option value="medium">Medium (≥80%)</option>
-            </select>
-
-            <button id="inboxConfirmAllBtn" class="btn btn-primary btn-sm">
-              ✅ Confirm All
-            </button>
-          </div>
-        </div>
-
-        <!-- AI Inbox Cards Target -->
-        <div id="inboxContainer">
-          <!-- Rendered by InboxManager -->
-        </div>
-      </section>
-
-      <!-- TAB 3: MY TASKS & KANBAN TRACKING -->
-      <section id="tab-tasks" class="tab-pane">
-        <div class="inbox-toolbar">
-          <div class="inbox-filters-row">
-            <select id="taskOwnerFilter" class="form-select">
-              <option value="all">👥 All Team Owners</option>
-            </select>
-
-            <select id="taskPriorityFilter" class="form-select">
-              <option value="all">⚡ All Priorities</option>
-              <option value="urgent">Urgent</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
-
-            <select id="taskSourceFilter" class="form-select">
-              <option value="all">🌐 All Sources</option>
-              <option value="slack">Slack</option>
-              <option value="email">Email</option>
-              <option value="meeting">Meeting</option>
-            </select>
-
-            <input type="text" id="taskSearchInput" class="form-input" placeholder="🔍 Search tasks or quotes..." style="width: 230px;">
-          </div>
-
-          <div style="display: flex; align-items: center; gap: 0.55rem;">
-            <!-- View Mode Switcher -->
-            <button id="viewKanbanBtn" class="btn btn-secondary btn-sm" style="background: rgba(16,185,129,0.15); color: var(--color-primary); border-color: rgba(16,185,129,0.3);">
-              📋 Kanban View
-            </button>
-            <button id="viewListBtn" class="btn btn-secondary btn-sm">
-              📑 List View
-            </button>
-            <button id="addNewTaskManualBtn" class="btn btn-primary btn-sm">
-              ➕ New Task
-            </button>
-          </div>
-        </div>
-
-        <!-- Kanban Board View -->
-        <div id="kanbanBoardContainer" class="kanban-grid">
-          <!-- Rendered by TaskManager -->
-        </div>
-
-        <!-- List Table View (Hidden by default) -->
-        <div id="tasksListContainer" style="display: none;">
-          <!-- Rendered by TaskManager -->
-        </div>
-      </section>
-
-      <!-- TAB 4: COMMITMENT HISTORY & AUDIT TRAIL -->
-      <section id="tab-history" class="tab-pane">
-        <div class="content-card">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
-            <div>
-              <h3 class="content-card-title" style="margin-bottom: 0;">📜 Commitment Audit Trail & Source History</h3>
-              <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 2px;">
-                Complete traceability linking every confirmed task directly to the original email thread, chat message, or meeting transcript.
-              </p>
+            <div id="radarRiskItemsContainer">
+              <!-- Rendered via JS -->
             </div>
-            <button id="exportAuditCsvBtn" class="btn btn-secondary btn-sm">
-              ⬇️ Export Audit Log (CSV)
-            </button>
-          </div>
-
-          <div class="table-responsive">
-            <table class="tasks-table">
-              <thead>
-                <tr>
-                  <th>Timestamp</th>
-                  <th>Task ID & Summary</th>
-                  <th>Responsible Owner</th>
-                  <th>Source Channel</th>
-                  <th>Audit Action</th>
-                </tr>
-              </thead>
-              <tbody id="auditHistoryTableBody">
-                <!-- Rendered dynamically -->
-              </tbody>
-            </table>
           </div>
         </div>
       </section>
 
-      <!-- TAB 5: TEAM ANALYTICS & RELIABILITY SCORE -->
-      <section id="tab-analytics" class="tab-pane">
-        <div class="analytics-grid">
+      <!-- ======================================================================
+           VIEW 5: TEAM & EMPLOYEES (#view-analytics)
+           ====================================================================== -->
+      <section id="view-analytics" class="view-pane">
+        <div class="view-content-wrapper">
           
-          <div class="chart-card">
-            <h3 class="content-card-title">📈 Commitment-to-Task Conversion Rate</h3>
-            <p style="font-size: 0.825rem; color: var(--text-secondary); margin-bottom: 1rem;">Ratio of detected promises converted into formal tracked deliverables.</p>
-            <div style="height: 280px; display: flex; align-items: center; justify-content: center;">
-              <canvas id="conversionDoughnutChart"></canvas>
-            </div>
-          </div>
-
-          <div class="chart-card">
-            <h3 class="content-card-title">🛡️ Team Member Execution & Reliability Index</h3>
-            <p style="font-size: 0.825rem; color: var(--text-secondary); margin-bottom: 1rem;">Task delivery punctuality and promise completion score per teammate.</p>
-            <div style="height: 280px; display: flex; align-items: center; justify-content: center;">
-              <canvas id="reliabilityBarChart"></canvas>
-            </div>
-          </div>
-
-        </div>
-
-        <div class="content-card" style="margin-top: 1.5rem;">
-          <h3 class="content-card-title">👥 Team Member Reliability Roster</h3>
-          <p style="font-size: 0.825rem; color: var(--text-secondary);">Real-time metrics tracking on-time delivery across engineering, product, and sales.</p>
-          <div class="team-members-grid" id="teamMembersGrid">
-            <!-- Rendered dynamically -->
-          </div>
-        </div>
-      </section>
-
-      <!-- TAB 6: SAAS PRICING & BUSINESS MODEL -->
-      <section id="tab-pricing" class="tab-pane">
-        <div class="pricing-header">
-          <h2 class="pricing-title">Simple, Transparent SaaS Pricing</h2>
-          <p style="color: var(--text-secondary); font-size: 0.95rem;">
-            Turn forgotten informal promises into tracked execution. Choose the plan that fits your organization.
-          </p>
-
-          <div style="display: inline-flex; align-items: center; gap: 0.75rem; background: var(--bg-card); padding: 7px 16px; border-radius: var(--radius-full); border: 1px solid var(--border-subtle); margin-top: 1.35rem; box-shadow: var(--shadow-sm);">
-            <span style="font-size: 0.85rem; font-weight: 600;">Monthly Billing</span>
-            <input type="checkbox" id="pricingBillingToggle" style="accent-color: var(--color-primary); cursor: pointer; transform: scale(1.15);">
-            <span style="font-size: 0.85rem; font-weight: 700; color: var(--color-primary);">Annual Billing (Save 20%)</span>
-          </div>
-        </div>
-
-        <!-- 4 Pricing Tiers -->
-        <div class="pricing-plans-grid">
-          
-          <!-- Free Plan -->
-          <div class="plan-card">
-            <div class="plan-name">Free</div>
-            <div class="plan-price">₹0</div>
-            <div class="plan-price-period">forever free for individuals</div>
-            <p class="plan-desc">For individual freelancers testing commitment detection on personal workflows.</p>
-            <ul class="plan-features-list">
-              <li class="plan-feature-item">✓ Up to 30 detected commitments / mo</li>
-              <li class="plan-feature-item">✓ Manual text & transcript paste</li>
-              <li class="plan-feature-item">✓ Personal Kanban board</li>
-              <li class="plan-feature-item">✓ Standard deadline alerts</li>
-            </ul>
-            <button class="btn btn-secondary" style="width: 100%;">Get Started Free</button>
-          </div>
-
-          <!-- Pro Plan -->
-          <div class="plan-card">
-            <div class="plan-name">Pro</div>
-            <div class="plan-price" id="proPriceDisplay">₹299</div>
-            <div class="plan-price-period">/ user / month</div>
-            <p class="plan-desc">For professionals and consultants who juggle dozens of client promises every week.</p>
-            <ul class="plan-features-list">
-              <li class="plan-feature-item">✓ Unlimited commitment detection</li>
-              <li class="plan-feature-item">✓ Gmail & Outlook sync integration</li>
-              <li class="plan-feature-item">✓ Forgotten-Work Risk Radar</li>
-              <li class="plan-feature-item">✓ High-confidence NLP parsing (98%)</li>
-              <li class="plan-feature-item">✓ Export to CSV & Markdown</li>
-            </ul>
-            <button class="btn btn-primary" style="width: 100%;">Start 14-Day Free Trial</button>
-          </div>
-
-          <!-- Team Plan (Featured) -->
-          <div class="plan-card featured">
-            <div class="plan-badge-top">MOST POPULAR</div>
-            <div class="plan-name">Team</div>
-            <div class="plan-price" id="teamPriceDisplay" style="color: var(--color-primary);">₹599</div>
-            <div class="plan-price-period">/ user / month</div>
-            <p class="plan-desc">For fast-growing startups, agencies, and IT companies to eliminate dropped balls.</p>
-            <ul class="plan-features-list">
-              <li class="plan-feature-item">✓ <strong>Everything in Pro</strong></li>
-              <li class="plan-feature-item">✓ Slack & MS Teams channel listeners</li>
-              <li class="plan-feature-item">✓ Cross-team task delegation</li>
-              <li class="plan-feature-item">✓ Team Reliability Analytics & Index</li>
-              <li class="plan-feature-item">✓ 2-Way Sync with Jira & Linear</li>
-              <li class="plan-feature-item">✓ Automated Slack Reminder Nudges</li>
-            </ul>
-            <button class="btn btn-primary" style="width: 100%;">Upgrade Team</button>
-          </div>
-
-          <!-- Enterprise Plan -->
-          <div class="plan-card">
-            <div class="plan-name">Enterprise</div>
-            <div class="plan-price">Custom</div>
-            <div class="plan-price-period">volume licensing & custom SLAs</div>
-            <p class="plan-desc">For large organizations requiring strict compliance, private cloud, and custom SSO.</p>
-            <ul class="plan-features-list">
-              <li class="plan-feature-item">✓ <strong>Everything in Team</strong></li>
-              <li class="plan-feature-item">✓ Dedicated private LLM instance</li>
-              <li class="plan-feature-item">✓ SOC 2 & HIPAA zero-retention guarantee</li>
-              <li class="plan-feature-item">✓ SAML 2.0 / Okta SSO & SCIM</li>
-              <li class="plan-feature-item">✓ Dedicated Customer Success Manager</li>
-            </ul>
-            <button class="btn btn-secondary" style="width: 100%;">Contact Sales</button>
-          </div>
-
-        </div>
-
-        <!-- Interactive ROI Calculator Card -->
-        <div style="background: var(--bg-card); backdrop-filter: blur(20px); border: 1px solid var(--border-subtle); border-radius: var(--radius-xl); padding: 2rem; margin-top: 2rem; box-shadow: var(--shadow-md), var(--shadow-card-inner);">
-          <h3 class="content-card-title">💡 CommitPulse ROI & Productivity Savings Calculator</h3>
-          <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem;">Estimate the financial cost recovered by preventing dropped commitments across your team:</p>
-          <div class="roi-calc-grid">
-            <div>
-              <div class="form-group">
-                <label class="form-label" style="display: flex; justify-content: space-between;">
-                  <span>Number of Employees / Team Members:</span>
-                  <strong id="roiEmployeesCount" style="color: var(--color-primary); font-size: 1rem;">25</strong>
-                </label>
-                <input type="range" id="roiEmployeesSlider" min="5" max="200" value="25" style="accent-color: var(--color-primary); cursor: pointer; width: 100%;">
+          <!-- Prominent Dedicated Employee Creator Card -->
+          <div class="employee-creator-card">
+            <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span class="badge badge-primary" style="font-size: 0.75rem;">ADMINISTRATOR TOOL</span>
+                  <h3 style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 800; color: var(--text-primary);">
+                    Create Employee Account with Password
+                  </h3>
+                </div>
+                <p style="font-size: 0.86rem; color: var(--text-secondary); margin-top: 0.35rem; max-width: 680px;">
+                  Register employee email addresses and secure passwords for your team members to sign in.
+                </p>
               </div>
 
-              <div class="form-group" style="margin-top: 1.5rem;">
-                <label class="form-label" style="display: flex; justify-content: space-between;">
-                  <span>Estimated Forgotten Promises Prevented per Person / Month:</span>
-                  <strong id="roiForgottenCount" style="color: var(--color-primary); font-size: 1rem;">6</strong>
-                </label>
-                <input type="range" id="roiForgottenSlider" min="1" max="20" value="6" style="accent-color: var(--color-primary); cursor: pointer; width: 100%;">
+              <button id="openAddMemberBtn" class="btn btn-primary" style="padding: 0.65rem 1.25rem; font-weight: 700;">
+                + Create Employee Account
+              </button>
+            </div>
+
+            <!-- Fast Inline Employee Creation Form -->
+            <form id="inlineCreateEmployeeForm" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) auto; gap: 0.75rem; margin-top: 1.25rem; align-items: end; background: var(--bg-card); padding: 1.15rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Employee Full Name</label>
+                <input type="text" id="inlineEmpName" class="form-input" placeholder="e.g. Alex Taylor" required>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Work Email ID</label>
+                <input type="email" id="inlineEmpEmail" class="form-input" placeholder="alex@company.com" required>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Password</label>
+                <input type="password" id="inlineEmpPassword" class="form-input" placeholder="e.g. alexPass123" required>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Role / Department</label>
+                <input type="text" id="inlineEmpRole" class="form-input" placeholder="e.g. Software Engineer">
+              </div>
+              <button type="submit" class="btn btn-primary" style="height: 40px; font-weight: 700;">
+                Create Account
+              </button>
+            </form>
+          </div>
+
+          <!-- Employee Roster Grid -->
+          <div class="content-card" style="margin-bottom: 1.5rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
+              <h3 class="content-card-title" style="margin-bottom: 0;">Registered Team & Employee Roster</h3>
+              <span style="font-size: 0.78rem; color: var(--color-primary); font-weight: 700; font-family: var(--font-mono);" id="rosterCountBadge">1 Account Registered</span>
+            </div>
+            <p style="font-size: 0.825rem; color: var(--text-secondary); margin-bottom: 1rem;">
+              All registered employees can sign in using their registered Email ID and Password.
+            </p>
+            <div class="team-members-grid" id="teamMembersGrid">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <div class="analytics-grid">
+            <div class="chart-card">
+              <h3 class="content-card-title">Commitment-to-Deliverable Rate</h3>
+              <p style="font-size: 0.825rem; color: var(--text-secondary); margin-bottom: 1rem;">Ratio of detected meeting commitments approved into formal deliverables.</p>
+              <div style="height: 260px; display: flex; align-items: center; justify-content: center;">
+                <canvas id="conversionDoughnutChart"></canvas>
               </div>
             </div>
 
-            <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(6, 182, 212, 0.08)); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-lg); padding: 1.75rem; display: flex; flex-direction: column; justify-content: center; box-shadow: var(--shadow-card-inner);">
-              <div style="font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Estimated Monthly Value Saved</div>
-              <div style="font-size: 2.6rem; font-weight: 800; color: var(--color-primary); font-family: var(--font-heading); margin: 0.35rem 0;" id="roiSavedAmount">₹1,12,500</div>
-              <div style="font-size: 0.825rem; color: var(--text-muted); line-height: 1.45;">Based on ~150 dropped balls prevented and 75 executive follow-up hours recovered per month.</div>
+            <div class="chart-card">
+              <h3 class="content-card-title">Team Member Reliability Index</h3>
+              <p style="font-size: 0.825rem; color: var(--text-secondary); margin-bottom: 1rem;">Milestone delivery timeliness and task completion score per team member.</p>
+              <div style="height: 260px; display: flex; align-items: center; justify-content: center;">
+                <canvas id="reliabilityBarChart"></canvas>
+              </div>
             </div>
           </div>
         </div>
+      </section>
 
+      <!-- ======================================================================
+           VIEW 6: AUDIT & TRACEABILITY (#view-history)
+           ====================================================================== -->
+      <section id="view-history" class="view-pane">
+        <div class="view-content-wrapper">
+          <div class="content-card">
+            <div class="view-header" style="margin-bottom: 1rem;">
+              <div class="view-title-group">
+                <h3 class="content-card-title" style="margin-bottom: 0;">Audit Trail & Source Traceability</h3>
+                <p class="view-desc">
+                  Complete institutional record linking every confirmed deliverable directly to the original meeting transcript or email.
+                </p>
+              </div>
+              <button id="exportAuditCsvBtn" class="btn btn-secondary btn-sm">
+                Export Audit Log (CSV)
+              </button>
+            </div>
+
+            <div class="table-responsive">
+              <table class="tasks-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Deliverable ID & Summary</th>
+                    <th>Responsible Member</th>
+                    <th>Source Context</th>
+                    <th>Audit Status</th>
+                  </tr>
+                </thead>
+                <tbody id="auditHistoryTableBody">
+                  <!-- Rendered dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================================
+           VIEW 7: PLANS & ROI CALCULATOR (INR PRICING) (#view-pricing)
+           ====================================================================== -->
+      <section id="view-pricing" class="view-pane">
+        <div class="view-content-wrapper">
+          <div style="text-align: center; max-width: 700px; margin: 0 auto 2rem auto;">
+            <h2 class="view-title" style="justify-content: center;">SaaS Plans & Pricing (INR ₹)</h2>
+            <p class="view-desc" style="font-size: 0.95rem; margin-top: 0.5rem;">
+              Eliminate lost commitments and dropped deliverables across your organization.
+            </p>
+
+            <div style="display: inline-flex; align-items: center; gap: 0.75rem; background: var(--bg-card); padding: 7px 16px; border-radius: var(--radius-full); border: 1px solid var(--border-subtle); margin-top: 1.35rem; box-shadow: var(--shadow-sm);">
+              <span style="font-size: 0.85rem; font-weight: 600;">Monthly Billing</span>
+              <input type="checkbox" id="pricingBillingToggle" style="accent-color: var(--color-primary); cursor: pointer; transform: scale(1.15);">
+              <span style="font-size: 0.85rem; font-weight: 700; color: var(--color-primary);">Annual Billing (Save 20%)</span>
+            </div>
+          </div>
+
+          <div class="pricing-plans-grid">
+            
+            <div class="plan-card">
+              <div class="plan-name">Starter</div>
+              <div class="plan-price">₹0</div>
+              <div class="plan-price-period">free for small teams</div>
+              <p class="plan-desc">For individuals and small teams capturing personal meeting action items.</p>
+              <ul class="plan-features-list">
+                <li>Up to 30 detected commitments / mo</li>
+                <li>Manual meeting transcript paste</li>
+                <li>Personal Kanban milestone board</li>
+                <li>Standard deadline alerts</li>
+              </ul>
+              <button class="btn btn-secondary" style="width: 100%;">Get Started Free</button>
+            </div>
+
+            <div class="plan-card">
+              <div class="plan-name">Professional</div>
+              <div class="plan-price" id="proPriceDisplay">₹299</div>
+              <div class="plan-price-period">/ user / month</div>
+              <p class="plan-desc">For managers and team leads managing active project deliverables.</p>
+              <ul class="plan-features-list">
+                <li>Unlimited action item extraction</li>
+                <li>Google Meet & Zoom transcript sync</li>
+                <li>Milestone Risk Radar</li>
+                <li>High-precision NLP parsing (98%)</li>
+                <li>Export to CSV & JIRA</li>
+              </ul>
+              <button class="btn btn-primary" style="width: 100%;">Start Free Trial</button>
+            </div>
+
+            <div class="plan-card featured">
+              <div class="plan-badge-top">RECOMMENDED FOR TEAMS</div>
+              <div class="plan-name">Team Growth</div>
+              <div class="plan-price" id="teamPriceDisplay" style="color: var(--color-primary);">₹799</div>
+              <div class="plan-price-period">/ team / month</div>
+              <p class="plan-desc">For fast-moving teams and departments to eliminate dropped deliverables.</p>
+              <ul class="plan-features-list">
+                <li><strong>Everything in Professional</strong></li>
+                <li>Slack & MS Teams live stream listener</li>
+                <li>Cross-team deliverable delegation</li>
+                <li>Team Reliability Index & Analytics</li>
+                <li>Linear, Asana, & Notion sync</li>
+                <li>Automated discussion reminder nudges</li>
+              </ul>
+              <button class="btn btn-primary" style="width: 100%;">Deploy Team</button>
+            </div>
+
+            <div class="plan-card">
+              <div class="plan-name">Enterprise</div>
+              <div class="plan-price">Custom</div>
+              <div class="plan-price-period">custom licensing</div>
+              <p class="plan-desc">For enterprises requiring custom AI models, SOC2 compliance, and SSO.</p>
+              <ul class="plan-features-list">
+                <li><strong>Everything in Team Growth</strong></li>
+                <li>Private VPC / on-premise LLM deployment</li>
+                <li>SOC2 & GDPR data compliance guarantee</li>
+                <li>SAML 2.0 / Okta / Azure AD SSO</li>
+                <li>Dedicated Customer Success Director</li>
+              </ul>
+              <button class="btn btn-secondary" style="width: 100%;">Contact Enterprise Sales</button>
+            </div>
+
+          </div>
+
+          <!-- Team Financial Recovery Calculator in INR -->
+          <div class="content-card" style="margin-top: 2rem; padding: 2rem;">
+            <h3 class="content-card-title">Team Productivity & ROI Calculator (INR ₹)</h3>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem;">Estimate the operational hours and monthly financial savings recovered across your team in India:</p>
+            <div class="roi-calc-grid">
+              <div>
+                <div class="form-group">
+                  <label class="form-label" style="display: flex; justify-content: space-between;">
+                    <span>Number of Team Members:</span>
+                    <strong id="roiEmployeesCount" style="color: var(--color-primary); font-size: 1rem;">25</strong>
+                  </label>
+                  <input type="range" id="roiEmployeesSlider" min="5" max="200" value="25" style="accent-color: var(--color-primary); cursor: pointer; width: 100%;">
+                </div>
+
+                <div class="form-group" style="margin-top: 1.5rem;">
+                  <label class="form-label" style="display: flex; justify-content: space-between;">
+                    <span>Estimated Forgotten Promises Prevented per Member / Month:</span>
+                    <strong id="roiForgottenCount" style="color: var(--color-primary); font-size: 1rem;">6</strong>
+                  </label>
+                  <input type="range" id="roiForgottenSlider" min="1" max="20" value="6" style="accent-color: var(--color-primary); cursor: pointer; width: 100%;">
+                </div>
+              </div>
+
+              <div style="background: var(--color-primary-light); border: 1px solid var(--border-glow); border-radius: var(--radius-lg); padding: 1.75rem; display: flex; flex-direction: column; justify-content: center; box-shadow: var(--shadow-card-inner);">
+                <div style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Estimated Monthly Financial Value Saved</div>
+                <div style="font-size: 2.4rem; font-weight: 800; color: var(--color-primary); font-family: var(--font-heading); margin: 0.35rem 0;" id="roiSavedAmount">₹1,12,500 Saved</div>
+                <div style="font-size: 0.825rem; color: var(--text-muted); line-height: 1.45;" id="roiHoursDesc">Based on ~150 dropped commitments prevented and ~225 follow-up hours saved per month.</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
       </section>
 
     </main>
   </div>
 
-  <!-- Custom Ingest / Message Paste Modal -->
+  <!-- Create Employee Account Modal (Admin Only) -->
+  <div id="addMemberModal" class="modal-overlay">
+    <div class="modal-dialog" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 class="modal-title">Create Employee Account & Password</h3>
+        <button class="modal-close-btn" onclick="window.commitPulseApp.closeAddMemberModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem;">
+          Add an employee to your organization. They will sign in using this Email ID and Password.
+        </p>
+        <div class="form-group">
+          <label class="form-label">Employee Full Name</label>
+          <input type="text" id="newMemberName" class="form-input" placeholder="e.g. Alex Taylor" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Employee Work Email ID</label>
+          <input type="email" id="newMemberEmail" class="form-input" placeholder="alex@company.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" id="newMemberPassword" class="form-input" placeholder="Set employee password" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Role / Title</label>
+          <input type="text" id="newMemberRole" class="form-input" placeholder="e.g. Senior Software Engineer">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Department</label>
+          <input type="text" id="newMemberDept" class="form-input" placeholder="e.g. Engineering">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="window.commitPulseApp.closeAddMemberModal()">Cancel</button>
+        <button class="btn btn-primary" id="saveAddMemberBtn">Create Account</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ingest Meeting Modal -->
   <div id="ingestModal" class="modal-overlay">
     <div class="modal-dialog">
       <div class="modal-header">
-        <h3 class="modal-title">➕ Ingest Communication for AI Detection</h3>
-        <button class="modal-close-btn" onclick="window.commitPulseApp.closeIngestModal()">✕</button>
+        <h3 class="modal-title">Ingest Communication Stream</h3>
+        <button class="modal-close-btn" onclick="window.commitPulseApp.closeIngestModal()">×</button>
       </div>
       <div class="modal-body">
         <div class="form-group">
-          <label class="form-label">Source Type</label>
+          <label class="form-label">Channel Type</label>
           <select id="customIngestSource" class="form-select">
-            <option value="Slack">💬 Slack Message / Thread</option>
-            <option value="Email">✉️ Gmail / Outlook Email</option>
-            <option value="Meeting">🎙️ Meeting Transcript</option>
+            <option value="Meeting Transcript">Meeting Audio Transcript (Zoom / Meet / Teams)</option>
+            <option value="Client Email">Client Email Thread</option>
+            <option value="Slack Stream">Slack / Chat Stream</option>
           </select>
         </div>
 
         <div class="form-group">
-          <label class="form-label">Channel / Context Name</label>
-          <input type="text" id="customIngestChannel" class="form-input" placeholder="e.g. #marketing-sprint, Client Email, Zoom Call">
+          <label class="form-label">Channel / Meeting Title</label>
+          <input type="text" id="customIngestChannel" class="form-input" placeholder="e.g. Sprint 15 Architecture Sync">
         </div>
 
         <div class="form-group">
-          <label class="form-label">Paste Communication Text</label>
-          <textarea id="customIngestText" class="form-textarea" rows="6" placeholder="Rahul, please send the sales report by Friday 5 PM.&#10;I will complete the Figma tokens tomorrow before noon.&#10;Can you check with the supplier by Wednesday?"></textarea>
+          <label class="form-label">Paste Transcript / Discussion Text</label>
+          <textarea id="customIngestText" class="form-textarea" rows="6" placeholder="Lead: Please deploy the database failover replication by Friday 5 PM.&#10;Engineer: I will complete the microservices specification document tomorrow before noon.&#10;Lead: Can you verify the cluster backup quota with IT by Wednesday?"></textarea>
         </div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="window.commitPulseApp.closeIngestModal()">Cancel</button>
-        <button class="btn btn-primary" id="runCustomIngestBtn">✨ Scan for Commitments</button>
+        <button class="btn btn-primary" id="runCustomIngestBtn">Scan for Action Items</button>
       </div>
     </div>
   </div>
@@ -536,17 +779,17 @@
   <div id="editCommitmentModal" class="modal-overlay">
     <div class="modal-dialog">
       <div class="modal-header">
-        <h3 class="modal-title">✏️ Edit Detected Commitment</h3>
-        <button class="modal-close-btn" onclick="window.commitPulseApp.closeEditCommitmentModal()">✕</button>
+        <h3 class="modal-title">Edit Detected Deliverable</h3>
+        <button class="modal-close-btn" onclick="window.commitPulseApp.closeEditCommitmentModal()">×</button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="editCommitmentId">
         <div class="form-group">
-          <label class="form-label">Action / Task Title</label>
+          <label class="form-label">Action Item Title</label>
           <input type="text" id="editCommitmentTitle" class="form-input">
         </div>
         <div class="form-group">
-          <label class="form-label">Responsible Owner</label>
+          <label class="form-label">Responsible Member</label>
           <input type="text" id="editCommitmentOwner" class="form-input">
         </div>
         <div class="form-group">
@@ -572,15 +815,15 @@
 
   <!-- Delegate Commitment Modal -->
   <div id="delegateModal" class="modal-overlay">
-    <div class="modal-dialog" style="max-width: 480px;">
+    <div class="modal-dialog" style="max-width: 460px;">
       <div class="modal-header">
-        <h3 class="modal-title">🔄 Delegate Commitment</h3>
-        <button class="modal-close-btn" onclick="window.commitPulseApp.closeDelegateModal()">✕</button>
+        <h3 class="modal-title">Reassign Deliverable</h3>
+        <button class="modal-close-btn" onclick="window.commitPulseApp.closeDelegateModal()">×</button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="delegateCommitmentId">
-        <p style="font-size: 0.875rem; color: var(--text-secondary);">
-          Reassign this detected work commitment to a teammate:
+        <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          Reassign this action item to a registered team member:
         </p>
         <div class="form-group">
           <label class="form-label">Select Team Member</label>
@@ -591,7 +834,7 @@
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="window.commitPulseApp.closeDelegateModal()">Cancel</button>
-        <button class="btn btn-primary" id="saveDelegateBtn">Reassign & Save</button>
+        <button class="btn btn-primary" id="saveDelegateBtn">Reassign Deliverable</button>
       </div>
     </div>
   </div>
@@ -600,17 +843,17 @@
   <div id="taskDetailModal" class="modal-overlay">
     <div class="modal-dialog">
       <div class="modal-header">
-        <h3 class="modal-title" id="taskDetailModalTitle">Task Details</h3>
-        <button class="modal-close-btn" onclick="window.commitPulseApp.closeTaskModal()">✕</button>
+        <h3 class="modal-title" id="taskDetailModalTitle">Deliverable Details</h3>
+        <button class="modal-close-btn" onclick="window.commitPulseApp.closeTaskModal()">×</button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="modalTaskId">
         <div class="form-group">
-          <label class="form-label">Task Title</label>
+          <label class="form-label">Deliverable Title</label>
           <input type="text" id="modalTaskTitle" class="form-input">
         </div>
         <div class="form-group">
-          <label class="form-label">Owner</label>
+          <label class="form-label">Assigned Member</label>
           <input type="text" id="modalTaskOwner" class="form-input">
         </div>
         <div class="form-group">
@@ -618,7 +861,7 @@
           <select id="modalTaskStatus" class="form-select">
             <option value="todo">To Do</option>
             <option value="in-progress">In Progress</option>
-            <option value="waiting">Waiting / Blocked</option>
+            <option value="waiting">In Review / Blocked</option>
             <option value="done">Completed</option>
           </select>
         </div>
@@ -627,8 +870,8 @@
           <input type="text" id="modalTaskDeadline" class="form-input">
         </div>
         <div class="form-group">
-          <label class="form-label">Original Conversation Snippet</label>
-          <div id="modalTaskOriginalSnippet" style="background: rgba(0,0,0,0.3); padding: 0.85rem; border-radius: var(--radius-sm); font-size: 0.85rem; color: #cbd5e1; font-style: italic;"></div>
+          <label class="form-label">Original Discussion Quote</label>
+          <div id="modalTaskOriginalSnippet" style="background: var(--bg-subtle); padding: 0.85rem; border-radius: var(--radius-xs); font-size: 0.85rem; color: var(--text-secondary); font-style: italic;"></div>
         </div>
       </div>
       <div class="modal-footer">
@@ -639,19 +882,19 @@
     </div>
   </div>
 
-  <!-- AI Settings Modal -->
+  <!-- NLP Settings Modal -->
   <div id="settingsModal" class="modal-overlay">
     <div class="modal-dialog" style="max-width: 500px;">
       <div class="modal-header">
-        <h3 class="modal-title">⚙️ AI Engine Settings</h3>
-        <button class="modal-close-btn" onclick="window.commitPulseApp.closeSettingsModal()">✕</button>
+        <h3 class="modal-title">Meetpulse NLP Engine Settings</h3>
+        <button class="modal-close-btn" onclick="window.commitPulseApp.closeSettingsModal()">×</button>
       </div>
       <div class="modal-body">
         <div class="form-group">
           <label class="form-label">Google Gemini API Key (Optional)</label>
           <input type="password" id="geminiApiKeyInput" class="form-input" placeholder="AIzaSy...">
           <small style="color: var(--text-muted); font-size: 0.775rem; margin-top: 4px;">
-            Optional. When omitted, CommitPulse uses its high-speed built-in NLP heuristics engine for real-time offline commitment extraction.
+            Optional. When omitted, Meetpulse uses its high-speed built-in NLP heuristics engine for real-time offline commitment extraction.
           </small>
         </div>
       </div>
@@ -662,10 +905,10 @@
     </div>
   </div>
 
-  <!-- Toast Notifications Container -->
+  <!-- Toast Container -->
   <div id="toastContainer" class="toast-container"></div>
 
-  <!-- Master Application Script -->
+  <!-- Application Script -->
   <script type="module" src="js/app.js"></script>
 </body>
 </html>

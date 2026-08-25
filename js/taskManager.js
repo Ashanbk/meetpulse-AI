@@ -1,4 +1,4 @@
-// taskManager.js - Confirmed Tasks, Kanban Board, and Forgotten-Work Alert Engine
+// taskManager.js - Meetpulse Deliverables, Kanban Sprint Board, and Milestone Risk Engine (Emoji-Free)
 
 export class TaskManager {
   constructor(kanbanContainerId, listContainerId, alertBannerId, onTaskStateChange) {
@@ -9,7 +9,7 @@ export class TaskManager {
     this.auditHistory = [];
     this.onTaskStateChange = onTaskStateChange;
 
-    this.currentViewMode = "kanban"; // "kanban" or "list"
+    this.currentViewMode = "kanban";
     this.filterOwner = "all";
     this.filterPriority = "all";
     this.filterSource = "all";
@@ -34,7 +34,7 @@ export class TaskManager {
       owner: task.owner,
       sourceType: task.sourceType,
       sourceChannel: task.sourceChannel,
-      action: "Created from Commitment",
+      action: "Created from Meeting Commitment",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })
     });
     this.render();
@@ -53,7 +53,7 @@ export class TaskManager {
         owner: updatedTask.owner,
         sourceType: updatedTask.sourceType,
         sourceChannel: updatedTask.sourceChannel,
-        action: `Updated (Status: ${updatedTask.status.toUpperCase()})`,
+        action: `Updated Status: ${updatedTask.status.toUpperCase()}`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })
       });
       this.render();
@@ -83,7 +83,7 @@ export class TaskManager {
         owner: task.owner,
         sourceType: task.sourceType,
         sourceChannel: task.sourceChannel,
-        action: `Status moved to ${newStatus.toUpperCase()}`,
+        action: `Moved to ${newStatus.toUpperCase()}`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })
       });
       this.render();
@@ -120,7 +120,7 @@ export class TaskManager {
       owner: t.owner,
       sourceType: t.sourceType,
       sourceChannel: t.sourceChannel,
-      action: t.status === "done" ? "Completed" : "Confirmed & Tracked",
+      action: t.status === "done" ? "Verified & Completed" : "Approved & Tracked",
       timestamp: t.confirmedAt || "Aug 24, 2026"
     }));
   }
@@ -170,10 +170,10 @@ export class TaskManager {
     if (!this.kanbanContainer) return;
 
     const columns = [
-      { id: "todo", title: "To Do", icon: "📋", color: "var(--color-todo)" },
-      { id: "in-progress", title: "In Progress", icon: "⚡", color: "var(--color-progress)" },
-      { id: "waiting", title: "Waiting / Blocked", icon: "⏳", color: "var(--color-waiting)" },
-      { id: "done", title: "Completed", icon: "✅", color: "var(--color-done)" }
+      { id: "todo", title: "To Do", color: "var(--color-todo)" },
+      { id: "in-progress", title: "In Progress", color: "var(--color-progress)" },
+      { id: "waiting", title: "In Review", color: "var(--color-waiting)" },
+      { id: "done", title: "Completed", color: "var(--color-done)" }
     ];
 
     let html = "";
@@ -184,7 +184,7 @@ export class TaskManager {
           <div class="kanban-col-header">
             <div class="kanban-col-title-wrap">
               <span class="kanban-col-dot" style="background: ${col.color}"></span>
-              <span class="kanban-col-title">${col.icon} ${col.title}</span>
+              <span class="kanban-col-title">${col.title}</span>
             </div>
             <span class="kanban-col-count">${colTasks.length}</span>
           </div>
@@ -193,11 +193,10 @@ export class TaskManager {
       `;
 
       if (colTasks.length === 0) {
-        html += `<div style="text-align: center; color: var(--text-muted); font-size: 0.825rem; padding: 2.5rem 0.5rem; border: 1px dashed var(--border-subtle); border-radius: var(--radius-md);">No tasks in this stage</div>`;
+        html += `<div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 2.5rem 0.5rem; border: 1px dashed var(--border-subtle); border-radius: var(--radius-sm);">No active deliverables</div>`;
       } else {
         colTasks.forEach(task => {
           const isOverdue = task.deadline.toLowerCase().includes("overdue") || task.deadline.toLowerCase().includes("yesterday");
-          const sourceIcon = task.sourceType === "Slack" ? "💬" : task.sourceType === "Email" ? "✉️" : "🎙️";
 
           html += `
             <div class="kanban-card ${task.isForgottenRisk && task.status !== 'done' ? 'risk-card' : ''}" draggable="true" ondragstart="window.commitPulseApp.handleDragStart(event, '${task.id}')" onclick="window.commitPulseApp.openTaskModal('${task.id}')">
@@ -208,30 +207,30 @@ export class TaskManager {
 
               <h4 class="task-card-title">${task.title}</h4>
 
-              <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.75rem; color: var(--text-muted);">
-                <span>${sourceIcon} ${task.sourceType}</span>
+              <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-mono);">
+                <span>${task.sourceType}</span>
                 <span>•</span>
                 <span>${task.sourceChannel}</span>
               </div>
 
               ${task.isForgottenRisk && task.status !== "done" ? `
                 <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: var(--radius-xs); padding: 4px 8px; font-size: 0.75rem; font-weight: 700; color: #f87171;">
-                  <span>${isOverdue ? '🚨 OVERDUE' : '🟠 Risk'}</span>
+                  <span>${isOverdue ? 'OVERDUE' : 'AT RISK'}</span>
                   <span>${task.deadline}</span>
                 </div>
               ` : `
-                <div style="font-size: 0.775rem; color: var(--text-secondary); font-family: var(--font-mono);">
-                  📅 Due: <strong>${task.deadline}</strong>
+                <div style="font-size: 0.76rem; color: var(--text-secondary); font-family: var(--font-mono);">
+                  Due: <strong>${task.deadline}</strong>
                 </div>
               `}
 
               <div class="task-card-footer">
                 <div class="owner-pill" title="Assigned to ${task.owner}" style="font-size: 0.8rem;">
-                  <span>${task.ownerAvatar || '👤'}</span>
+                  <span class="avatar-initials avatar-sm">${task.ownerAvatar || 'ST'}</span>
                   <span>${task.owner}</span>
                 </div>
-                <button class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.75rem; border-color: rgba(54, 197, 240, 0.3); color: var(--color-slack);" title="Send Instant Slack Reminder" onclick="event.stopPropagation(); window.commitPulseApp.sendNudge('${task.id}')">
-                  🔔 Nudge
+                <button class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.72rem; border-color: rgba(56, 189, 248, 0.3); color: var(--color-accent);" title="Send Slack/Email Reminder Nudge" onclick="event.stopPropagation(); window.commitPulseApp.sendNudge('${task.id}')">
+                  Reminder
                 </button>
               </div>
             </div>
@@ -252,7 +251,7 @@ export class TaskManager {
     if (!this.listContainer) return;
 
     if (filtered.length === 0) {
-      this.listContainer.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 3.5rem;">No confirmed tasks found matching filters.</div>`;
+      this.listContainer.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 3.5rem;">No deliverables matching active filter parameters.</div>`;
       return;
     }
 
@@ -261,9 +260,9 @@ export class TaskManager {
         <table class="tasks-table">
           <thead>
             <tr>
-              <th>Task ID & Action</th>
-              <th>Owner</th>
-              <th>Source</th>
+              <th>Deliverable ID & Action Item</th>
+              <th>Responsible Member</th>
+              <th>Channel Context</th>
               <th>Priority</th>
               <th>Status</th>
               <th>Target Deadline</th>
@@ -274,36 +273,35 @@ export class TaskManager {
     `;
 
     filtered.forEach(t => {
-      const sourceIcon = t.sourceType === "Slack" ? "💬" : t.sourceType === "Email" ? "✉️" : "🎙️";
       const isOverdue = t.deadline.toLowerCase().includes("overdue") || t.deadline.toLowerCase().includes("yesterday");
 
       html += `
         <tr onclick="window.commitPulseApp.openTaskModal('${t.id}')" style="cursor: pointer;">
           <td>
-            <div style="font-weight: 700; color: var(--color-primary); font-size: 0.8rem; font-family: var(--font-mono);">${t.id}</div>
-            <div style="font-weight: 700; color: var(--text-primary); font-size: 0.925rem;">${t.title}</div>
-            <div style="font-size: 0.775rem; color: var(--text-muted); font-style: italic; margin-top: 2px;">“${t.originalSnippet?.substring(0, 60)}...”</div>
+            <div style="font-weight: 700; color: var(--color-primary); font-size: 0.78rem; font-family: var(--font-mono);">${t.id}</div>
+            <div style="font-weight: 700; color: var(--text-primary); font-size: 0.9rem;">${t.title}</div>
+            <div style="font-size: 0.76rem; color: var(--text-muted); font-style: italic; margin-top: 2px;">"${t.originalSnippet?.substring(0, 60)}..."</div>
           </td>
           <td>
             <div class="owner-pill">
-              <span>${t.ownerAvatar || '👤'}</span>
+              <span class="avatar-initials avatar-sm">${t.ownerAvatar || 'ST'}</span>
               <span>${t.owner}</span>
             </div>
           </td>
           <td>
-            <span style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 600;">${sourceIcon} ${t.sourceType}</span>
+            <span style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 600;">${t.sourceType}</span>
           </td>
           <td>
             <span class="priority-badge priority-${t.priority.toLowerCase()}">${t.priority}</span>
           </td>
           <td>
-            <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; padding: 2px 8px; border-radius: var(--radius-xs); background: rgba(255,255,255,0.06);">${t.status.toUpperCase()}</span>
+            <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; padding: 2px 8px; border-radius: var(--radius-xs); background: rgba(255,255,255,0.06); font-family: var(--font-mono);">${t.status.toUpperCase()}</span>
           </td>
           <td>
-            <span style="font-size: 0.825rem; font-family: var(--font-mono); color: ${isOverdue ? 'var(--color-danger)' : 'var(--text-primary)'}; font-weight: 600;">⏱️ ${t.deadline}</span>
+            <span style="font-size: 0.8rem; font-family: var(--font-mono); color: ${isOverdue ? 'var(--color-danger)' : 'var(--text-primary)'}; font-weight: 600;">${t.deadline}</span>
           </td>
           <td onclick="event.stopPropagation();">
-            <button class="btn btn-secondary btn-sm" onclick="window.commitPulseApp.sendNudge('${t.id}')">🔔 Nudge</button>
+            <button class="btn btn-secondary btn-sm" onclick="window.commitPulseApp.sendNudge('${t.id}')">Reminder</button>
           </td>
         </tr>
       `;
@@ -313,7 +311,6 @@ export class TaskManager {
     this.listContainer.innerHTML = html;
   }
 
-  // Render Forgotten-Work Radar Alert Banner
   renderAlerts() {
     if (!this.alertBannerContainer) return;
 
@@ -328,18 +325,18 @@ export class TaskManager {
     const isOverdue = topRisk.deadline.toLowerCase().includes("overdue") || topRisk.deadline.toLowerCase().includes("yesterday");
 
     this.alertBannerContainer.innerHTML = `
-      <div class="radar-pulse-icon">${isOverdue ? '🚨' : '🟠'}</div>
+      <div class="radar-status-code">${isOverdue ? 'OVERDUE' : 'RISK'}</div>
       <div style="flex: 1;">
-        <div style="font-weight: 800; font-size: 0.95rem; color: ${isOverdue ? '#fca5a5' : '#fde047'};">
-          ${isOverdue ? 'CRITICAL OVERDUE COMMITMENT DETECTED' : 'FORGOTTEN WORK RISK RADAR'} (${riskyTasks.length} Commitments at Risk)
+        <div style="font-weight: 800; font-size: 0.92rem; color: ${isOverdue ? '#fca5a5' : '#fde047'};">
+          ${isOverdue ? 'CRITICAL DELIVERABLE OVERDUE' : 'DEADLINE RISK DETECTED'} (${riskyTasks.length} Commitments Pending)
         </div>
-        <div style="font-size: 0.85rem; color: #e2e8f0; margin-top: 3px; line-height: 1.45;">
-          <strong>${topRisk.owner}</strong> promised: <em>"${topRisk.title}"</em> • Due <strong>${topRisk.deadline}</strong> in ${topRisk.sourceType} (${topRisk.sourceChannel})
+        <div style="font-size: 0.84rem; color: #e2e8f0; margin-top: 3px; line-height: 1.45;">
+          <strong>${topRisk.owner}</strong>: "${topRisk.title}" • Deadline: <strong>${topRisk.deadline}</strong> in ${topRisk.sourceType} (${topRisk.sourceChannel})
         </div>
       </div>
       <div style="display: flex; gap: 0.6rem; align-items: center;">
         <button class="btn btn-sm btn-danger" onclick="window.commitPulseApp.sendNudge('${topRisk.id}')">
-          ⚡ Instant Slack Nudge
+          Send Nudge
         </button>
         <button class="btn btn-sm btn-secondary" onclick="window.commitPulseApp.openTaskModal('${topRisk.id}')">
           View Details

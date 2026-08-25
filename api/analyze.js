@@ -1,4 +1,4 @@
-// api/analyze.js - Vercel Serverless Function for AI Commitment Detection
+// api/analyze.js - Meetpulse Vercel Serverless Function for Commitment Detection (Emoji-Free)
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { text, sourceType = "Slack", sourceChannel = "General", sender = "Team Member" } = req.body || {};
+    const { text, sourceType = "Meeting Transcript", sourceChannel = "General", sender = "Team Member" } = req.body || {};
 
     if (!text || typeof text !== 'string' || !text.trim()) {
       return res.status(400).json({ error: "Missing required 'text' parameter in request body." });
@@ -27,7 +27,6 @@ export default async function handler(req, res) {
       commitments = await analyzeWithGemini(text, sourceType, sourceChannel, apiKey);
     }
 
-    // Fallback to NLP heuristics if Gemini is not configured or returns empty
     if (!commitments || commitments.length === 0) {
       commitments = analyzeWithNLPHeuristics(text, sourceType, sourceChannel, sender);
     }
@@ -45,11 +44,10 @@ export default async function handler(req, res) {
   }
 }
 
-// Fallback NLP heuristic parser
 function analyzeWithNLPHeuristics(text, sourceType, sourceChannel, defaultSender) {
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   const results = [];
-  const triggerKeywords = ["will", "can you", "please", "need to", "promise", "by friday", "by tomorrow", "eod", "review", "update", "complete", "send"];
+  const triggerKeywords = ["will", "can you", "please", "need to", "promise", "by friday", "by tomorrow", "eod", "review", "update", "complete", "send", "compile", "upload", "submit", "deploy"];
 
   lines.forEach((line, idx) => {
     let cleanText = line;
@@ -74,10 +72,10 @@ function analyzeWithNLPHeuristics(text, sourceType, sourceChannel, defaultSender
 
       results.push({
         id: `com-${Date.now().toString().slice(-4)}-${idx + 1}`,
-        taskTitle: cleanText.replace(/^(Rahul|Priya|Vikram|Aarav|Sarah|Marcus|David|Kavita|Rohan),?\s*/i, '').trim(),
-        owner: sender || "Team Member",
-        ownerAvatar: "👤",
-        ownerRole: "Team Member",
+        taskTitle: cleanText.replace(/^(Alex|Admin|Sarah|Marcus|David|Elena),?\s*/i, '').trim(),
+        owner: sender || "Staff Member",
+        ownerAvatar: "ST",
+        ownerRole: "Staff Member",
         requester: defaultSender || "Self-committed",
         deadline,
         priority: lower.includes("urgent") || lower.includes("tomorrow") ? "Urgent" : "High",
@@ -94,10 +92,9 @@ function analyzeWithNLPHeuristics(text, sourceType, sourceChannel, defaultSender
   return results;
 }
 
-// Gemini LLM extractor
 async function analyzeWithGemini(text, sourceType, sourceChannel, apiKey) {
   try {
-    const prompt = `You are CommitPulse AI. Extract confirmed work commitments from this text:\n\n"${text}"\n\nReturn a clean JSON array with items containing: taskTitle, owner, requester, deadline, priority (Urgent/High/Medium/Low), confidence (70-99), originalSnippet. Return ONLY raw JSON.`;
+    const prompt = `You are Meetpulse AI. Extract deliverables and commitments from this text:\n\n"${text}"\n\nReturn a clean JSON array with items containing: taskTitle, owner, requester, deadline, priority (Urgent/High/Medium/Low), confidence (70-99), originalSnippet. Return ONLY raw JSON.`;
 
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: "POST",
@@ -116,10 +113,10 @@ async function analyzeWithGemini(text, sourceType, sourceChannel, apiKey) {
     const parsed = JSON.parse(rawJson);
     return (Array.isArray(parsed) ? parsed : []).map((item, idx) => ({
       id: `com-gemini-${Date.now().toString().slice(-4)}-${idx + 1}`,
-      taskTitle: item.taskTitle || "Work Deliverable",
+      taskTitle: item.taskTitle || "Deliverable",
       owner: item.owner || "Assignee",
-      ownerAvatar: "👤",
-      ownerRole: "Team Member",
+      ownerAvatar: "ST",
+      ownerRole: "Staff Member",
       requester: item.requester || "Requester",
       deadline: item.deadline || "Friday, 5:00 PM",
       priority: item.priority || "High",

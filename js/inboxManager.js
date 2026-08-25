@@ -1,4 +1,4 @@
-// inboxManager.js - AI Inbox & Human-in-the-Loop Confirmation Management
+// inboxManager.js - Meetpulse Action Item Queue & Human Confirmation Manager (Emoji-Free)
 
 export class InboxManager {
   constructor(containerId, { onTaskConfirmed, onCommitmentDismissed, onInboxUpdated }) {
@@ -47,9 +47,9 @@ export class InboxManager {
         id: `TASK-${Math.floor(100 + Math.random() * 900)}`,
         title: item.taskTitle,
         owner: item.owner,
-        ownerAvatar: item.ownerAvatar,
-        ownerRole: item.ownerRole,
-        requester: item.requester,
+        ownerAvatar: item.ownerAvatar || "ST",
+        ownerRole: item.ownerRole || "Staff Member",
+        requester: item.requester || "Team Lead",
         deadline: item.deadline,
         deadlineISO: item.deadlineISO,
         priority: item.priority,
@@ -79,9 +79,9 @@ export class InboxManager {
         id: `TASK-${Math.floor(100 + Math.random() * 900)}`,
         title: item.taskTitle,
         owner: item.owner,
-        ownerAvatar: item.ownerAvatar,
-        ownerRole: item.ownerRole,
-        requester: item.requester,
+        ownerAvatar: item.ownerAvatar || "ST",
+        ownerRole: item.ownerRole || "Staff Member",
+        requester: item.requester || "Team Lead",
         deadline: item.deadline,
         deadlineISO: item.deadlineISO,
         priority: item.priority,
@@ -92,7 +92,7 @@ export class InboxManager {
         confidence: item.confidence,
         confirmedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         isForgottenRisk: item.urgencyDays <= 1,
-        notes: `Batch confirmed from ${item.sourceType}.`
+        notes: `Batch approved from ${item.sourceType}.`
       };
       if (this.onTaskConfirmed) this.onTaskConfirmed(confirmedTask);
     });
@@ -128,7 +128,7 @@ export class InboxManager {
 
   filterList() {
     return this.pendingCommitments.filter(c => {
-      const matchSource = this.sourceFilter === "all" || c.sourceType.toLowerCase() === this.sourceFilter.toLowerCase();
+      const matchSource = this.sourceFilter === "all" || c.sourceType.toLowerCase().includes(this.sourceFilter.toLowerCase());
       let matchConf = true;
       if (this.confidenceFilter === "high") matchConf = c.confidence >= 90;
       else if (this.confidenceFilter === "medium") matchConf = c.confidence >= 80;
@@ -143,13 +143,12 @@ export class InboxManager {
     if (filtered.length === 0) {
       this.container.innerHTML = `
         <div class="inbox-empty-card">
-          <div style="font-size: 3.5rem; margin-bottom: 0.75rem;">🎉</div>
-          <h3 style="font-family: var(--font-heading); font-size: 1.35rem; font-weight: 800; color: var(--text-primary);">All Caught Up in AI Inbox!</h3>
-          <p style="color: var(--text-secondary); font-size: 0.9rem; max-width: 480px; margin: 0.5rem auto 1.5rem auto; line-height: 1.5;">
-            No pending commitments waiting for confirmation. CommitPulse is actively monitoring your communications for hidden work promises.
+          <h3 style="font-family: var(--font-heading); font-size: 1.35rem; font-weight: 800; color: var(--text-primary);">All Action Items Reviewed</h3>
+          <p style="color: var(--text-secondary); font-size: 0.88rem; max-width: 480px; margin: 0.5rem auto 1.5rem auto; line-height: 1.5;">
+            No pending commitments waiting for confirmation. Meetpulse is actively monitoring meeting streams, email threads, and chat channels.
           </p>
           <button class="btn btn-primary" onclick="window.commitPulseApp.triggerDemoSim()">
-            ✨ Ingest Sample Corporate Communication
+            Ingest Sample Meeting Stream
           </button>
         </div>
       `;
@@ -159,23 +158,18 @@ export class InboxManager {
     let html = `<div class="inbox-cards-grid">`;
 
     filtered.forEach(c => {
-      const sourceIcon = c.sourceType === "Slack" ? "💬" : c.sourceType === "Email" ? "✉️" : "🎙️";
-      const sourceClass = `source-${c.sourceType.toLowerCase()}`;
       const confColor = c.confidence >= 90 ? "var(--color-primary)" : c.confidence >= 80 ? "var(--color-accent)" : "var(--color-warning)";
-      
-      // Calculate SVG stroke offset for 24px circle (r=9, circumference = 2 * PI * 9 ~= 56.5)
       const circumference = 56.54;
       const strokeOffset = circumference - (c.confidence / 100) * circumference;
 
       html += `
         <div class="inbox-card" id="card-${c.id}">
           <div class="inbox-card-top">
-            <div class="source-tag ${sourceClass}">
-              <span>${sourceIcon}</span>
-              <span>${c.sourceType}: <strong>${c.sourceChannel}</strong></span>
+            <div class="source-tag">
+              <span>Channel: <strong>${c.sourceChannel}</strong> (${c.sourceType})</span>
             </div>
 
-            <div class="confidence-meter-chip" title="AI Extraction Confidence Score">
+            <div class="confidence-meter-chip" title="AI Extraction Confidence">
               <svg class="radial-meter-svg" viewBox="0 0 24 24">
                 <circle cx="12" cy="12" r="9" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="2.5"></circle>
                 <circle cx="12" cy="12" r="9" fill="none" stroke="${confColor}" stroke-width="2.5" stroke-dasharray="${circumference}" stroke-dashoffset="${strokeOffset}" stroke-linecap="round"></circle>
@@ -185,56 +179,55 @@ export class InboxManager {
           </div>
 
           <div class="inbox-quote-box">
-            <span class="quote-icon">“</span>
-            <span class="quote-text">${c.originalSnippet}</span>
+            <span>"${c.originalSnippet}"</span>
           </div>
 
           <div class="extracted-details-deck">
             <div class="extracted-item">
-              <span class="extracted-label">🎯 Action Item:</span>
+              <span class="extracted-label">Deliverable:</span>
               <span class="extracted-value title-val">${c.taskTitle}</span>
             </div>
 
             <div class="extracted-row">
               <div class="extracted-item">
-                <span class="extracted-label">👤 Responsible Owner:</span>
+                <span class="extracted-label">Responsible Member:</span>
                 <div class="owner-pill">
-                  <span>${c.ownerAvatar || '👤'}</span>
+                  <span class="avatar-initials avatar-sm">${c.ownerAvatar || 'ST'}</span>
                   <strong>${c.owner}</strong>
-                  <span class="owner-sub">(${c.ownerRole || 'Member'})</span>
+                  <span class="owner-sub">(${c.ownerRole || 'Staff'})</span>
                 </div>
               </div>
 
               <div class="extracted-item">
-                <span class="extracted-label">📅 Target Deadline:</span>
-                <span class="deadline-pill">⏱️ ${c.deadline}</span>
+                <span class="extracted-label">Target Deadline:</span>
+                <span class="deadline-pill">${c.deadline}</span>
               </div>
             </div>
 
             <div class="extracted-row" style="margin-top: 0.25rem;">
               <div class="extracted-item">
-                <span class="extracted-label">🗣️ Requester:</span>
-                <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">${c.requester}</span>
+                <span class="extracted-label">Requester:</span>
+                <span style="font-size: 0.82rem; color: var(--text-secondary); font-weight: 500;">${c.requester}</span>
               </div>
               <div class="extracted-item">
-                <span class="extracted-label">⚡ Priority:</span>
+                <span class="extracted-label">Priority:</span>
                 <span class="priority-badge priority-${c.priority.toLowerCase()}">${c.priority}</span>
               </div>
             </div>
           </div>
 
           <div class="inbox-actions-row">
-            <button class="btn btn-primary btn-confirm-task" onclick="window.commitPulseApp.confirmCommitment('${c.id}')" title="Approve and promote to formal task tracking">
-              ✅ Create Task
+            <button class="btn btn-primary btn-confirm-task" onclick="window.commitPulseApp.confirmCommitment('${c.id}')" title="Approve and promote to deliverables board">
+              Approve Deliverable
             </button>
-            <button class="btn btn-secondary btn-sm" onclick="window.commitPulseApp.openEditCommitmentModal('${c.id}')" title="Edit owner, deadline, or title before creating">
-              ✏️ Edit
+            <button class="btn btn-secondary btn-sm" onclick="window.commitPulseApp.openEditCommitmentModal('${c.id}')" title="Edit owner, deadline, or title before approving">
+              Edit
             </button>
-            <button class="btn btn-secondary btn-sm" onclick="window.commitPulseApp.openDelegateModal('${c.id}')" title="Reassign task to another team member">
-              🔄 Delegate
+            <button class="btn btn-secondary btn-sm" onclick="window.commitPulseApp.openDelegateModal('${c.id}')" title="Reassign deliverable to another team member">
+              Reassign
             </button>
-            <button class="btn btn-secondary btn-sm" onclick="window.commitPulseApp.dismissCommitment('${c.id}')" title="Ignore - Not a formal commitment" style="margin-left: auto; color: var(--text-muted);">
-              ✕ Ignore
+            <button class="btn btn-secondary btn-sm" onclick="window.commitPulseApp.dismissCommitment('${c.id}')" title="Ignore - Not a commitment" style="margin-left: auto; color: var(--text-muted);">
+              Dismiss
             </button>
           </div>
         </div>
