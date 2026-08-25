@@ -18,8 +18,10 @@ class MeetPulseApp {
     this.activeViewId = 'view-chat';
     this.charts = { conversion: null, reliability: null };
     this.inchatCommitmentsMap = new Map();
+    this.deferredPrompt = null;
 
     this.init();
+    this.initPwa();
   }
 
   init() {
@@ -51,6 +53,56 @@ class MeetPulseApp {
     } else {
       this.openAuthOverlay();
     }
+  }
+
+  initPwa() {
+    // Register Service Worker for offline capability & PWA
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').then((reg) => {
+          console.log('Meetpulse Service Worker Registered:', reg.scope);
+        }).catch((err) => {
+          console.log('Meetpulse Service Worker registration skipped:', err);
+        });
+      });
+    }
+
+    // Capture PWA Install Prompt
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      this.deferredPrompt = e;
+      const headerBtn = document.getElementById('installPwaHeaderBtn');
+      const sidebarBtn = document.getElementById('installPwaSidebarBtn');
+      if (headerBtn) headerBtn.style.display = 'inline-flex';
+      if (sidebarBtn) sidebarBtn.style.display = 'inline-flex';
+    });
+
+    window.addEventListener('appinstalled', () => {
+      this.deferredPrompt = null;
+      this.showToast('Meetpulse is running as an installed standalone web app!');
+    });
+  }
+
+  triggerPwaInstall() {
+    if (this.deferredPrompt) {
+      this.deferredPrompt.prompt();
+      this.deferredPrompt.userChoice.then((choiceResult) => {
+        if (choiceResult.outcome === 'accepted') {
+          this.showToast('Meetpulse Web App installed successfully!');
+        }
+        this.deferredPrompt = null;
+      });
+    } else {
+      this.openInstallAppModal();
+    }
+  }
+
+  openInstallAppModal() {
+    document.getElementById('installAppModal')?.classList.add('active');
+  }
+
+  closeInstallAppModal() {
+    document.getElementById('installAppModal')?.classList.remove('active');
   }
 
   initUsers() {
@@ -629,6 +681,17 @@ class MeetPulseApp {
         this.switchView(viewId);
         if (window.innerWidth <= 992) closeSidebar();
       });
+    });
+
+    // Install Web App Triggers
+    document.getElementById('installPwaHeaderBtn')?.addEventListener('click', () => {
+      this.triggerPwaInstall();
+    });
+    document.getElementById('installPwaSidebarBtn')?.addEventListener('click', () => {
+      this.triggerPwaInstall();
+    });
+    document.getElementById('directPwaInstallBtn')?.addEventListener('click', () => {
+      this.triggerPwaInstall();
     });
 
     // Top Header Notification Bell & Flyout
