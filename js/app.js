@@ -146,16 +146,28 @@ class MeetPulseApp {
   }
 
   applyRolePermissions() {
-    const isAdmin = this.currentUser && (this.currentUser.isAdmin || this.currentUser.role === 'Administrator');
+    const isAdmin = Boolean(this.currentUser && (this.currentUser.isAdmin || this.currentUser.role === 'Administrator'));
+
+    if (isAdmin) {
+      document.body.classList.remove('is-employee');
+      document.body.classList.add('is-admin');
+      document.documentElement.classList.remove('is-employee');
+      document.documentElement.classList.add('is-admin');
+    } else {
+      document.body.classList.remove('is-admin');
+      document.body.classList.add('is-employee');
+      document.documentElement.classList.remove('is-admin');
+      document.documentElement.classList.add('is-employee');
+    }
 
     // Admin-only elements
-    document.querySelectorAll('.admin-only-element').forEach(el => {
-      el.style.display = isAdmin ? '' : 'none';
+    document.querySelectorAll('.admin-only-element, #quickCreateEmpHeaderBtn, #openAddMemberSidebarBtn, #chipCreateEmployee, #adminOnlyEmployeeCreatorCard, #openAddMemberBtn, #notificationScheduleConfigCard, #broadcastDigestEmailBtn').forEach(el => {
+      el.style.setProperty('display', isAdmin ? '' : 'none', 'important');
     });
 
     // Employee Notice Banner
     const notice = document.getElementById('employeeViewNoticeBanner');
-    if (notice) notice.style.display = isAdmin ? 'none' : 'block';
+    if (notice) notice.style.setProperty('display', isAdmin ? 'none' : 'block', 'important');
   }
 
   openAuthOverlay() {
@@ -672,6 +684,7 @@ class MeetPulseApp {
 
   switchView(viewId) {
     this.activeViewId = viewId;
+    this.applyRolePermissions();
 
     document.querySelectorAll('.sidebar-item[data-view]').forEach(item => {
       if (item.getAttribute('data-view') === viewId) {

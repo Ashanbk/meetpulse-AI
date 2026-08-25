@@ -1767,6 +1767,30 @@ body {
   margin-bottom: 1.5rem;
 }
 
+/* Strict Role-Based Visibility Engine */
+body.is-employee .admin-only-element,
+body.is-employee #quickCreateEmpHeaderBtn,
+body.is-employee #openAddMemberSidebarBtn,
+body.is-employee #chipCreateEmployee,
+body.is-employee #adminOnlyEmployeeCreatorCard,
+body.is-employee #openAddMemberBtn,
+body.is-employee #addMemberModal,
+body.is-employee #notificationScheduleConfigCard,
+body.is-employee #broadcastDigestEmailBtn,
+body.is-employee .btn-delete-employee {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+body.is-employee #employeeViewNoticeBanner {
+  display: block !important;
+}
+
+body.is-admin #employeeViewNoticeBanner {
+  display: none !important;
+}
+
 /* ==========================================================================
    SCHEDULED EMAIL & NOTIFICATION FEED
    ========================================================================== */
