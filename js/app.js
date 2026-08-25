@@ -311,9 +311,15 @@ class MeetPulseApp {
     const unreadCount = userEmails.filter(e => !e.isRead).length;
 
     const bellBadge = document.getElementById('headerNotificationBadge');
+    const bellPulseRing = document.getElementById('bellPulseRing');
+
     if (bellBadge) {
       bellBadge.textContent = unreadCount;
       bellBadge.style.display = unreadCount > 0 ? 'inline-block' : 'none';
+    }
+
+    if (bellPulseRing) {
+      bellPulseRing.style.display = unreadCount > 0 ? 'block' : 'none';
     }
 
     const sidebarBadge = document.getElementById('sidebarEmailBadge');
@@ -325,6 +331,127 @@ class MeetPulseApp {
     if (heroStat) {
       heroStat.textContent = this.scheduledEmails.length;
     }
+
+    this.renderNotificationFlyout();
+  }
+
+  toggleNotificationFlyout() {
+    const flyout = document.getElementById('notificationFlyout');
+    if (flyout) {
+      const isOpening = !flyout.classList.contains('active');
+      flyout.classList.toggle('active');
+      if (isOpening) {
+        this.renderNotificationFlyout();
+      }
+    }
+  }
+
+  closeNotificationFlyout() {
+    document.getElementById('notificationFlyout')?.classList.remove('active');
+  }
+
+  renderNotificationFlyout() {
+    const list = document.getElementById('flyoutNotificationsList');
+    if (!list) return;
+
+    const currentEmail = this.currentUser ? this.currentUser.email.toLowerCase() : '';
+    const userEmails = this.scheduledEmails.filter(e => e.toEmail === 'all@meetpulse.ai' || e.toEmail.toLowerCase() === currentEmail);
+
+    if (userEmails.length === 0) {
+      list.innerHTML = `
+        <div style="text-align: center; padding: 1.5rem 0.5rem; color: var(--text-muted); font-size: 0.8rem;">
+          No notifications yet.
+        </div>
+      `;
+      return;
+    }
+
+    list.innerHTML = userEmails.slice(0, 6).map(mail => `
+      <div class="flyout-item ${!mail.isRead ? 'unread' : ''}" onclick="window.commitPulseApp.markEmailAsRead('${mail.id}'); window.commitPulseApp.switchView('view-notifications'); window.commitPulseApp.closeNotificationFlyout();">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.35rem;">
+          <strong style="font-size: 0.82rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${mail.subject}</strong>
+          <span style="font-size: 0.68rem; color: var(--text-muted); font-family: var(--font-mono);">${mail.timestamp}</span>
+        </div>
+        <div style="font-size: 0.74rem; color: var(--text-secondary); line-height: 1.35; max-height: 38px; overflow: hidden; text-overflow: ellipsis;">
+          ${this.escapeHtml(mail.body.substring(0, 85))}...
+        </div>
+      </div>
+    `).join('');
+  }
+
+  openComposeEmailModal(prefillRecipient = null) {
+    const modal = document.getElementById('composeEmailModal');
+    const recipientSelect = document.getElementById('composeRecipientSelect');
+    const taskLinkSelect = document.getElementById('composeTaskLinkSelect');
+
+    if (recipientSelect) {
+      let optionsHtml = `<option value="all">Entire Team (Broadcast to All Employees)</option>`;
+      this.registeredUsers.forEach(u => {
+        optionsHtml += `<option value="${u.email}">${u.name} (${u.email}) — ${u.role}</option>`;
+      });
+      recipientSelect.innerHTML = optionsHtml;
+      if (prefillRecipient) {
+        recipientSelect.value = prefillRecipient;
+      }
+    }
+
+    if (taskLinkSelect && this.taskManager) {
+      let taskOptions = `<option value="">None (General Email)</option>`;
+      this.taskManager.getTasks().forEach(t => {
+        taskOptions += `<option value="${t.id}">[${t.id}] ${t.title} (${t.owner})</option>`;
+      });
+      taskLinkSelect.innerHTML = taskOptions;
+    }
+
+    modal?.classList.add('active');
+  }
+
+  closeComposeEmailModal() {
+    document.getElementById('composeEmailModal')?.classList.remove('active');
+  }
+
+  handleSendCustomEmail({ recipientValue, subject, category, taskLinkId, message }) {
+    const senderName = this.currentUser ? this.currentUser.name : 'Team Member';
+    const senderEmail = this.currentUser ? this.currentUser.email : 'notifications@meetpulse.ai';
+
+    if (recipientValue === 'all') {
+      // Broadcast to all registered users
+      this.registeredUsers.forEach(user => {
+        const newEmail = {
+          id: `email-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          toEmail: user.email,
+          toName: user.name,
+          from: senderEmail,
+          subject: subject,
+          body: message,
+          taskId: taskLinkId || null,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          dateStr: new Date().toLocaleDateString(),
+          isRead: false,
+          triggerType: category || 'Team Broadcast'
+        };
+        this.scheduledEmails.unshift(newEmail);
+      });
+      this.saveEmails();
+      this.showToast(`Broadcasted email to all ${this.registeredUsers.length} team members!`);
+    } else {
+      // Send to specific individual
+      const targetUser = this.registeredUsers.find(u => u.email.toLowerCase() === recipientValue.toLowerCase());
+      const targetName = targetUser ? targetUser.name : recipientValue;
+
+      this.dispatchEmailNotification({
+        toEmail: recipientValue,
+        toName: targetName,
+        subject: subject,
+        body: message,
+        taskId: taskLinkId || null,
+        triggerType: category || 'Direct Mail'
+      });
+    }
+
+    this.closeComposeEmailModal();
+    this.renderEmailNotificationFeed();
+    this.updateNotificationBadges();
   }
 
   renderEmailNotificationFeed() {
@@ -495,9 +622,45 @@ class MeetPulseApp {
       });
     });
 
-    // Top Header Notification Bell
-    document.getElementById('headerNotificationBellBtn')?.addEventListener('click', () => {
-      this.switchView('view-notifications');
+    // Top Header Notification Bell & Flyout
+    document.getElementById('headerNotificationBellBtn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleNotificationFlyout();
+    });
+
+    // Top Header Compose Email Button
+    document.getElementById('headerComposeEmailBtn')?.addEventListener('click', () => {
+      this.openComposeEmailModal();
+    });
+
+    // Compose Email Form Submit
+    document.getElementById('composeEmailForm')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const recipientValue = document.getElementById('composeRecipientSelect')?.value;
+      const subject = document.getElementById('composeSubjectInput')?.value.trim();
+      const category = document.getElementById('composeCategorySelect')?.value;
+      const taskLinkId = document.getElementById('composeTaskLinkSelect')?.value;
+      const message = document.getElementById('composeMessageInput')?.value.trim();
+
+      if (!subject || !message) {
+        this.showToast('Please enter both subject and message body.');
+        return;
+      }
+
+      this.handleSendCustomEmail({ recipientValue, subject, category, taskLinkId, message });
+      document.getElementById('composeSubjectInput').value = '';
+      document.getElementById('composeMessageInput').value = '';
+    });
+
+    // Dismiss flyout when clicking outside
+    document.addEventListener('click', (e) => {
+      const flyout = document.getElementById('notificationFlyout');
+      const bellBtn = document.getElementById('headerNotificationBellBtn');
+      if (flyout && flyout.classList.contains('active')) {
+        if (!flyout.contains(e.target) && !bellBtn?.contains(e.target)) {
+          this.closeNotificationFlyout();
+        }
+      }
     });
 
     // Prompt Chips

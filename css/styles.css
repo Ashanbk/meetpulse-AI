@@ -728,36 +728,154 @@ body {
   flex-shrink: 0;
 }
 
-/* Notification Bell Chip */
+/* Notification Bell Chip & Flyout */
 .notification-bell-btn {
   position: relative;
   background: var(--bg-card);
   border: 1px solid var(--border-medium);
-  border-radius: var(--radius-xs);
-  padding: 0.45rem 0.65rem;
+  border-radius: var(--radius-sm);
+  padding: 0.48rem 0.75rem;
   color: var(--text-primary);
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.45rem;
   cursor: pointer;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 700;
   transition: all var(--transition-fast);
+  box-shadow: var(--shadow-sm);
 }
 
 .notification-bell-btn:hover {
   border-color: var(--color-primary);
   color: var(--color-primary);
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-1px);
+}
+
+.notification-bell-icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bell-pulse-ring {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-danger);
+  box-shadow: 0 0 8px var(--color-danger);
+  animation: bell-pulse 2s infinite;
+}
+
+@keyframes bell-pulse {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.4); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.8; }
 }
 
 .notification-badge-unread {
   background: var(--color-danger);
   color: #ffffff;
-  font-size: 0.65rem;
+  font-size: 0.68rem;
   font-family: var(--font-mono);
   font-weight: 800;
-  padding: 1px 5px;
+  padding: 1px 6px;
   border-radius: var(--radius-full);
+  line-height: 1.2;
+}
+
+/* Quick Notification Flyout Panel */
+.notification-flyout {
+  position: absolute;
+  top: calc(var(--header-height) + 8px);
+  right: 1.5rem;
+  width: 380px;
+  max-width: calc(100vw - 2rem);
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg), 0 10px 30px rgba(0,0,0,0.7);
+  z-index: 1050;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+  animation: flyoutSlide 0.22s cubic-bezier(0.175, 0.885, 0.32, 1);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+.notification-flyout.active {
+  display: flex;
+}
+
+@keyframes flyoutSlide {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.flyout-header {
+  padding: 0.85rem 1.15rem;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-subtle);
+}
+
+.flyout-title {
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.flyout-list {
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.flyout-item {
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.flyout-item:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-glow);
+}
+
+.flyout-item.unread {
+  border-left: 3px solid var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.flyout-footer {
+  padding: 0.65rem 1.15rem;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-subtle);
+  font-size: 0.76rem;
 }
 
 /* Chat Messages Stream Area */
