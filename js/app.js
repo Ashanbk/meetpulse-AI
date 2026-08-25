@@ -73,17 +73,37 @@ class MeetPulseApp {
       }
     }
 
-    // Always keep install buttons visible
-    const headerBtn = document.getElementById('installPwaHeaderBtn');
-    const sidebarBtn = document.getElementById('installPwaSidebarBtn');
-    if (headerBtn) headerBtn.style.setProperty('display', 'inline-flex', 'important');
-    if (sidebarBtn) sidebarBtn.style.setProperty('display', 'inline-flex', 'important');
+    // If app is already installed or running in standalone mode -> hide install buttons
+    if (this.isAppInstalled()) {
+      this.hideInstallButtons();
+    } else {
+      const headerBtn = document.getElementById('installPwaHeaderBtn');
+      const sidebarBtn = document.getElementById('installPwaSidebarBtn');
+      if (headerBtn) headerBtn.style.setProperty('display', 'inline-flex', 'important');
+      if (sidebarBtn) sidebarBtn.style.setProperty('display', 'inline-flex', 'important');
+    }
+
+    // Listen for standalone display-mode changes
+    try {
+      window.matchMedia('(display-mode: standalone)').addEventListener('change', (evt) => {
+        if (evt.matches) {
+          this.hideInstallButtons();
+        }
+      });
+    } catch (e) {}
 
     // Capture Native PWA Install Prompt
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       this.deferredPrompt = e;
       console.log('Native PWA install prompt ready.');
+
+      if (!this.isAppInstalled()) {
+        const headerBtn = document.getElementById('installPwaHeaderBtn');
+        const sidebarBtn = document.getElementById('installPwaSidebarBtn');
+        if (headerBtn) headerBtn.style.setProperty('display', 'inline-flex', 'important');
+        if (sidebarBtn) sidebarBtn.style.setProperty('display', 'inline-flex', 'important');
+      }
 
       const directBtn = document.getElementById('directPwaInstallBtn');
       if (directBtn) {
@@ -94,11 +114,29 @@ class MeetPulseApp {
       }
     });
 
+    // Handle Completed Installation
     window.addEventListener('appinstalled', () => {
       this.deferredPrompt = null;
+      localStorage.setItem('meetpulse_pwa_installed', 'true');
+      this.hideInstallButtons();
       this.closeInstallAppModal();
       this.showToast('Meetpulse is running as an installed standalone web app!');
     });
+  }
+
+  isAppInstalled() {
+    return window.matchMedia('(display-mode: standalone)').matches ||
+           window.navigator.standalone === true ||
+           document.referrer.includes('android-app://') ||
+           localStorage.getItem('meetpulse_pwa_installed') === 'true';
+  }
+
+  hideInstallButtons() {
+    document.body.classList.add('pwa-installed');
+    const headerBtn = document.getElementById('installPwaHeaderBtn');
+    const sidebarBtn = document.getElementById('installPwaSidebarBtn');
+    if (headerBtn) headerBtn.style.setProperty('display', 'none', 'important');
+    if (sidebarBtn) sidebarBtn.style.setProperty('display', 'none', 'important');
   }
 
   triggerPwaInstall() {
@@ -106,6 +144,8 @@ class MeetPulseApp {
       this.deferredPrompt.prompt();
       this.deferredPrompt.userChoice.then((choiceResult) => {
         if (choiceResult.outcome === 'accepted') {
+          localStorage.setItem('meetpulse_pwa_installed', 'true');
+          this.hideInstallButtons();
           this.showToast('Meetpulse Web App installed successfully!');
         }
         this.deferredPrompt = null;

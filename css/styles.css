@@ -1904,8 +1904,23 @@ body.is-employee #employeeViewNoticeBanner {
   display: block !important;
 }
 
-body.is-admin #employeeViewNoticeBanner {
+/* Standalone PWA Mode & Installed State - Hide Install Buttons */
+@media (display-mode: standalone) {
+  #installPwaHeaderBtn,
+  #installPwaSidebarBtn,
+  .pwa-install-trigger {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+}
+
+body.pwa-installed #installPwaHeaderBtn,
+body.pwa-installed #installPwaSidebarBtn,
+body.pwa-installed .pwa-install-trigger {
   display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 /* ==========================================================================
