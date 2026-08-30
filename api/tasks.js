@@ -1,0 +1,28 @@
+// api/tasks.js - Serverless function for Tasks & Inbox Deliverables
+let taskState = {
+  tasks: [],
+  inbox: []
+};
+
+export default function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method === 'GET') {
+    return res.status(200).json(taskState);
+  }
+
+  if (req.method === 'POST') {
+    const data = req.body || {};
+    if (data.tasks && Array.isArray(data.tasks)) taskState.tasks = data.tasks;
+    if (data.inbox && Array.isArray(data.inbox)) taskState.inbox = data.inbox;
+    return res.status(200).json({ success: true, state: taskState });
+  }
+
+  res.status(405).json({ error: "Method not allowed" });
+}

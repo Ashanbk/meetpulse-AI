@@ -1,10 +1,11 @@
-// sw.js - Meetpulse PWA Service Worker (Vercel & GitHub Pages compatible)
-const CACHE_NAME = 'meetpulse-cache-v3';
+// sw.js - Meetpulse PWA Service Worker (Vercel & GitHub Pages compatible with Dynamic Cloud DB Bypass)
+const CACHE_NAME = 'meetpulse-cache-v5';
 
 const PRECACHE_ASSETS = [
   'index.html',
   'css/styles.css',
   'js/app.js',
+  'js/cloudSync.js',
   'js/commitmentEngine.js',
   'js/inboxManager.js',
   'js/taskManager.js',
@@ -36,18 +37,36 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
 
+  // Bypass cache completely for all API and cloud sync requests
+  if (
+    event.request.method !== 'GET' ||
+    url.pathname.startsWith('/api/') ||
+    url.hostname.includes('restful-api.dev') ||
+    url.hostname.includes('firebaseio.com') ||
+    url.hostname.includes('supabase.co')
+  ) {
+    return;
+  }
+
+  // Network-first with cache fallback for app assets
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) {
-        return cached;
-      }
-      return fetch(event.request).catch(() => {
-        if (event.request.mode === 'navigate') {
-          return caches.match('index.html');
+    fetch(event.request)
+      .then((networkRes) => {
+        if (networkRes && networkRes.status === 200 && event.request.url.startsWith(self.location.origin)) {
+          const clone = networkRes.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
-      });
-    })
+        return networkRes;
+      })
+      .catch(() => {
+        return caches.match(event.request).then((cached) => {
+          if (cached) return cached;
+          if (event.request.mode === 'navigate') {
+            return caches.match('index.html');
+          }
+        });
+      })
   );
 });

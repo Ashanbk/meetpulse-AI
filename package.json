@@ -1,0 +1,25 @@
+{
+  "name": "meetpulse-ai",
+  "version": "2.3.0",
+  "type": "module",
+  "description": "Meetpulse AI - Real-time Meeting & Communication Commitment Intelligence with Worldwide Multi-Device Cloud Sync",
+  "main": "server.py",
+  "scripts": {
+    "start": "python server.py",
+    "dev": "python server.py",
+    "live": "python server.py",
+    "build": "echo 'Meetpulse AI build ready'",
+    "tunnel": "npx -y localtunnel --port 5000"
+  },
+  "keywords": [
+    "nlp",
+    "meeting-intelligence",
+    "commitments",
+    "deliverables",
+    "ai",
+    "pwa",
+    "cloud-sync"
+  ],
+  "author": "Meetpulse Team",
+  "license": "MIT"
+}

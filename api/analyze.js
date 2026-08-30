@@ -72,10 +72,10 @@ function analyzeWithNLPHeuristics(text, sourceType, sourceChannel, defaultSender
 
       results.push({
         id: `com-${Date.now().toString().slice(-4)}-${idx + 1}`,
-        taskTitle: cleanText.replace(/^(Alex|Admin|Sarah|Marcus|David|Elena),?\s*/i, '').trim(),
-        owner: sender || "Staff Member",
-        ownerAvatar: "ST",
-        ownerRole: "Staff Member",
+        taskTitle: cleanText.replace(/^(Administrator|Admin),?\s*/i, '').trim(),
+        owner: sender || "Administrator",
+        ownerAvatar: sender ? sender.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : "AD",
+        ownerRole: sender === "Administrator" ? "Administrator" : "Team Member",
         requester: defaultSender || "Self-committed",
         deadline,
         priority: lower.includes("urgent") || lower.includes("tomorrow") ? "Urgent" : "High",

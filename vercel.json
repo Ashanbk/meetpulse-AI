@@ -2,8 +2,48 @@
   "version": 2,
   "rewrites": [
     {
+      "source": "/api/live-sync",
+      "destination": "/api/live-sync.js"
+    },
+    {
+      "source": "/api/sync",
+      "destination": "/api/live-sync.js"
+    },
+    {
+      "source": "/api/chat",
+      "destination": "/api/chat.js"
+    },
+    {
+      "source": "/api/tasks",
+      "destination": "/api/tasks.js"
+    },
+    {
+      "source": "/api/emails",
+      "destination": "/api/emails.js"
+    },
+    {
+      "source": "/api/users/(.*)",
+      "destination": "/api/users.js?id=$1"
+    },
+    {
+      "source": "/api/users",
+      "destination": "/api/users.js"
+    },
+    {
+      "source": "/api/auth/login",
+      "destination": "/api/login.js"
+    },
+    {
+      "source": "/api/login",
+      "destination": "/api/login.js"
+    },
+    {
       "source": "/api/analyze",
       "destination": "/api/analyze.js"
+    },
+    {
+      "source": "/api/health",
+      "destination": "/api/health.js"
     }
   ]
 }

@@ -65,7 +65,12 @@
         <div id="quickCredentialsDeck" style="background: var(--bg-subtle); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 0.85rem; text-align: left; margin-bottom: 0.75rem;">
           <div style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 800; margin-bottom: 0.45rem; letter-spacing: 0.05em; display: flex; align-items: center; justify-content: space-between;">
             <span>Registered Employees:</span>
-            <span style="color: var(--color-primary); font-size: 0.68rem;">Click to Autofill</span>
+            <div style="display: flex; align-items: center; gap: 0.45rem;">
+              <button type="button" id="syncAccountsLoginBtn" class="btn btn-secondary btn-sm" style="font-size: 0.68rem; padding: 2px 7px; height: auto;" title="Fetch latest employee accounts from Global Cloud Database">
+                ↻ Sync Cloud DB
+              </button>
+              <span style="color: var(--color-primary); font-size: 0.68rem;">Click to Autofill</span>
+            </div>
           </div>
 
           <div id="employeePresetsList" style="display: flex; flex-direction: column; gap: 0.4rem; max-height: 120px; overflow-y: auto;">
@@ -96,6 +101,9 @@
             <div class="brand-subtitle">Commitment Intelligence</div>
           </div>
         </div>
+        <button id="sidebarCloseBtn" class="sidebar-close-btn" title="Close Navigation Drawer">
+          <svg class="icon-svg" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
       </div>
 
       <!-- Quick Action: Ingest Meeting, Create Employee & Install PWA -->
@@ -250,6 +258,12 @@
             </div>
 
             <div class="chat-header-actions">
+              <!-- Global Cloud Sync Status Badge -->
+              <div id="cloudSyncStatusBadge" class="channel-badge-status" style="cursor: pointer; background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.3); color: var(--color-primary); padding: 0.25rem 0.55rem; border-radius: var(--radius-full); font-size: 0.72rem; font-weight: 700;" title="Global Cloud Database Active — Synced across all devices worldwide" onclick="window.commitPulseApp.syncUsersFromServer(true)">
+                <span id="cloudSyncPulseDot" class="live-pulse-dot pulse-green"></span>
+                <span id="cloudSyncStatusText">Cloud DB: Online</span>
+              </div>
+
               <!-- Install Web App Button -->
               <button id="installPwaHeaderBtn" class="btn btn-secondary btn-sm" title="Install Meetpulse as Desktop / Mobile App">
                 <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
@@ -402,7 +416,13 @@
         <div class="view-content-wrapper">
           <div class="view-header">
             <div class="view-title-group">
-              <h2 class="view-title">Action Item Queue — Review & Approval</h2>
+              <div class="view-title-row-mobile">
+                <button class="mobile-menu-toggle" title="Open Navigation Menu">
+                  <svg class="icon-svg" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                  <span>Menu</span>
+                </button>
+                <h2 class="view-title">Action Item Queue — Review & Approval</h2>
+              </div>
               <p class="view-desc">
                 Review commitments detected in meetings and communication threads. Only approved deliverables enter the official sprint board.
               </p>
@@ -441,7 +461,13 @@
         <div class="view-content-wrapper">
           <div class="view-header">
             <div class="view-title-group">
-              <h2 class="view-title">Deliverables & Sprint Board</h2>
+              <div class="view-title-row-mobile">
+                <button class="mobile-menu-toggle" title="Open Navigation Menu">
+                  <svg class="icon-svg" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                  <span>Menu</span>
+                </button>
+                <h2 class="view-title">Deliverables & Sprint Board</h2>
+              </div>
               <p class="view-desc">
                 Track confirmed action items, architectural milestones, and client commitments on an interactive Kanban board.
               </p>
@@ -491,7 +517,13 @@
         <div class="view-content-wrapper">
           <div class="view-header">
             <div class="view-title-group">
-              <h2 class="view-title">Milestone Risk Radar</h2>
+              <div class="view-title-row-mobile">
+                <button class="mobile-menu-toggle" title="Open Navigation Menu">
+                  <svg class="icon-svg" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                  <span>Menu</span>
+                </button>
+                <h2 class="view-title">Milestone Risk Radar</h2>
+              </div>
               <p class="view-desc">
                 Proactive intelligence monitoring approaching deadlines, overdue deliverables, and at-risk commitments.
               </p>
@@ -521,7 +553,13 @@
         <div class="view-content-wrapper">
           <div class="view-header">
             <div class="view-title-group">
-              <h2 class="view-title">Scheduled Email Notifications & Mailbox</h2>
+              <div class="view-title-row-mobile">
+                <button class="mobile-menu-toggle" title="Open Navigation Menu">
+                  <svg class="icon-svg" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                  <span>Menu</span>
+                </button>
+                <h2 class="view-title">Scheduled Email Notifications & Mailbox</h2>
+              </div>
               <p class="view-desc">
                 All team members receive automated email dispatches and reminders directly inside Meetpulse.
               </p>
@@ -598,6 +636,20 @@
            ====================================================================== -->
       <section id="view-analytics" class="view-pane">
         <div class="view-content-wrapper">
+          <div class="view-header view-header-mobile-bar" style="margin-bottom: 1.25rem;">
+            <div class="view-title-group">
+              <div class="view-title-row-mobile">
+                <button class="mobile-menu-toggle" title="Open Navigation Menu">
+                  <svg class="icon-svg" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                  <span>Menu</span>
+                </button>
+                <h2 class="view-title">Team & Employees Workspace</h2>
+              </div>
+              <p class="view-desc">
+                Manage team directory, member accounts, commitment conversion analytics, and reliability scores.
+              </p>
+            </div>
+          </div>
           
           <!-- Prominent Dedicated Employee Creator Card (ADMIN ONLY) -->
           <div id="adminOnlyEmployeeCreatorCard" class="employee-creator-card admin-only-element">
@@ -654,11 +706,25 @@
           <!-- Employee Roster Grid -->
           <div class="content-card" style="margin-bottom: 1.5rem;">
             <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
-              <h3 class="content-card-title" style="margin-bottom: 0;">Registered Team & Employee Roster</h3>
-              <span style="font-size: 0.78rem; color: var(--color-primary); font-weight: 700; font-family: var(--font-mono);" id="rosterCountBadge">1 Account Registered</span>
+              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <h3 class="content-card-title" style="margin-bottom: 0;">Registered Team & Employee Roster</h3>
+                <span style="font-size: 0.78rem; color: var(--color-primary); font-weight: 700; font-family: var(--font-mono);" id="rosterCountBadge">1 Account Registered</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                <button id="syncTeamServerBtn" class="btn btn-secondary btn-sm" title="Sync registered team credentials with central server">
+                  ↻ Sync with Server
+                </button>
+                <button id="exportCredentialsBtn" class="btn btn-secondary btn-sm" title="Export team credentials JSON file">
+                  Export JSON
+                </button>
+                <button id="importCredentialsBtn" class="btn btn-secondary btn-sm" title="Import team credentials JSON file">
+                  Import JSON
+                </button>
+                <input type="file" id="importCredentialsFileInput" accept=".json" style="display: none;">
+              </div>
             </div>
             <p style="font-size: 0.825rem; color: var(--text-secondary); margin-bottom: 1rem;">
-              All registered employees sign in using their registered Email ID and Password.
+              All registered employees sign in using their registered Email ID and Password across all machines.
             </p>
             <div class="team-members-grid" id="teamMembersGrid">
               <!-- Rendered dynamically -->
@@ -693,7 +759,13 @@
           <div class="content-card">
             <div class="view-header" style="margin-bottom: 1rem;">
               <div class="view-title-group">
-                <h3 class="content-card-title" style="margin-bottom: 0;">Audit Trail & Source Traceability</h3>
+                <div class="view-title-row-mobile">
+                  <button class="mobile-menu-toggle" title="Open Navigation Menu">
+                    <svg class="icon-svg" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                    <span>Menu</span>
+                  </button>
+                  <h3 class="content-card-title" style="margin-bottom: 0;">Audit Trail & Source Traceability</h3>
+                </div>
                 <p class="view-desc">
                   Complete institutional record linking every confirmed deliverable directly to the original meeting transcript or email.
                 </p>
@@ -728,8 +800,23 @@
            ====================================================================== -->
       <section id="view-pricing" class="view-pane">
         <div class="view-content-wrapper">
+          <div class="view-header view-header-mobile-bar" style="margin-bottom: 1.5rem;">
+            <div class="view-title-group">
+              <div class="view-title-row-mobile">
+                <button class="mobile-menu-toggle" title="Open Navigation Menu">
+                  <svg class="icon-svg" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                  <span>Menu</span>
+                </button>
+                <h2 class="view-title">SaaS Plans & ROI (INR ₹)</h2>
+              </div>
+              <p class="view-desc">
+                Eliminate lost commitments and dropped deliverables across your organization.
+              </p>
+            </div>
+          </div>
+
           <div style="text-align: center; max-width: 700px; margin: 0 auto 2rem auto;">
-            <h2 class="view-title" style="justify-content: center;">SaaS Plans & Pricing (INR ₹)</h2>
+            <h2 class="view-title desktop-pricing-title" style="justify-content: center;">SaaS Plans & Pricing (INR ₹)</h2>
             <p class="view-desc" style="font-size: 0.95rem; margin-top: 0.5rem;">
               Eliminate lost commitments and dropped deliverables across your organization.
             </p>
@@ -841,6 +928,55 @@
       </section>
 
     </main>
+
+    <!-- Mobile Bottom Navigation Dock (Sticky at bottom on Mobile / PWA) -->
+    <nav class="mobile-bottom-nav" id="mobileBottomNav">
+      <button class="bottom-nav-item active" data-view="view-chat" id="bottomNavChat" title="Stream">
+        <div class="bottom-nav-icon-wrap">
+          <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        </div>
+        <span class="bottom-nav-label">Stream</span>
+      </button>
+
+      <button class="bottom-nav-item" data-view="view-inbox" id="bottomNavInbox" title="Queue">
+        <div class="bottom-nav-icon-wrap">
+          <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg>
+          <span class="bottom-nav-badge" id="bottomNavInboxBadge" style="display: none;">0</span>
+        </div>
+        <span class="bottom-nav-label">Queue</span>
+      </button>
+
+      <button class="bottom-nav-item" data-view="view-tasks" id="bottomNavTasks" title="Tasks">
+        <div class="bottom-nav-icon-wrap">
+          <svg class="icon-svg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="9" x2="15" y2="9"></line><line x1="9" y1="13" x2="15" y2="13"></line><line x1="9" y1="17" x2="13" y2="17"></line></svg>
+          <span class="bottom-nav-badge" id="bottomNavTasksBadge" style="display: none;">0</span>
+        </div>
+        <span class="bottom-nav-label">Tasks</span>
+      </button>
+
+      <button class="bottom-nav-item" data-view="view-radar" id="bottomNavRadar" title="Risks">
+        <div class="bottom-nav-icon-wrap">
+          <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
+          <span class="bottom-nav-badge badge-danger" id="bottomNavRadarBadge" style="display: none;">0</span>
+        </div>
+        <span class="bottom-nav-label">Risks</span>
+      </button>
+
+      <button class="bottom-nav-item" data-view="view-notifications" id="bottomNavNotifications" title="Emails">
+        <div class="bottom-nav-icon-wrap">
+          <svg class="icon-svg" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+          <span class="bottom-nav-badge" id="bottomNavEmailBadge" style="display: none;">0</span>
+        </div>
+        <span class="bottom-nav-label">Emails</span>
+      </button>
+
+      <button class="bottom-nav-item bottom-nav-menu-btn" id="bottomNavMenuTrigger" title="All Workspaces & Settings">
+        <div class="bottom-nav-icon-wrap">
+          <svg class="icon-svg" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </div>
+        <span class="bottom-nav-label">Menu</span>
+      </button>
+    </nav>
   </div>
 
   <!-- Create Employee Account Modal (Admin Only) -->

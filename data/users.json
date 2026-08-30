@@ -1,6 +1,4 @@
-// mockCommsData.js - Meetpulse User Setup & Registered Accounts (Root Admin Only)
-
-export const DEFAULT_USERS = [
+[
   {
     "id": "user-admin-1",
     "email": "admin@meetpulse.ai",
@@ -13,8 +11,4 @@ export const DEFAULT_USERS = [
     "activeTasks": 0,
     "reliabilityScore": 100
   }
-];
-
-export const PRELOADED_COMMS = [];
-
-export const INITIAL_CONFIRMED_TASKS = [];
+]

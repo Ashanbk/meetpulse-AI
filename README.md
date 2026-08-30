@@ -1,79 +1,101 @@
-# Meetpulse AI — Meeting & Communication Commitment Intelligence
+# Meetpulse AI — Real-Time Meeting & Communication Commitment Intelligence
 
-> **Never drop a promise again.** Meetpulse listens to team meetings, client calls, emails, and chat discussions to automatically detect commitments, assign owners, extract deadlines, and track deliverables to completion.
-
----
-
-## ⚡ Core Value Proposition
-
-Modern teams discuss dozens of commitments across Zoom calls, Google Meet sessions, client emails, and Slack channels every day. Over 40% of conversational action items get forgotten without being entered into formal project management tools.
-
-**Meetpulse AI solves this by acting as a passive commitment listener:**
-1. **Real-time Detection**: Extracts promises, deadlines, and assigned owners from meeting audio transcripts, client emails, and Slack streams.
-2. **Human-in-the-Loop Review**: Surfaces detected commitments in an Action Item Queue for 1-click confirmation or editing.
-3. **Interactive Deliverables Board**: Automatically converts approved commitments into Kanban tasks (*To Do*, *In Progress*, *In Review*, *Completed*).
-4. **Milestone Risk Radar**: Proactively alerts teams to approaching deadlines and overdue commitments with automated reminder nudges.
-5. **Team Reliability Metrics**: Quantifies follow-through rates and delivery punctuality.
+> **Never drop a promise again.** Meetpulse listens to team meetings, client calls, emails, and chat discussions to automatically detect commitments, assign owners, extract deadlines, and track deliverables to completion with live multi-device synchronization worldwide.
 
 ---
 
-## 🛠️ Architecture & Tech Stack
+## ⚡ Core Capabilities
 
-- **Frontend**: Vanilla JavaScript (ES6 Modules), HTML5 Semantic Structure, Custom CSS3 Design System with Pitch Black (OLED) Luxury Aesthetics and zero emojis.
-- **Charts & Visualizations**: Chart.js 4.4.0 for real-time conversion and punctuality metrics.
-- **AI & NLP Engine**: Built-in high-speed rule-based heuristic extraction engine + optional Google Gemini 1.5 Flash API integration.
-- **Server**: Lightweight Python HTTP server (`server.py`) and Vercel serverless functions (`api/analyze.js`).
-- **Role-Based Authentication**: Dedicated sessions for **Administrator** and **Employee** with persistent state.
+1. **Real-Time Detection**: Extracts promises, deadlines, and assigned owners from live transcripts, emails, and chat streams.
+2. **Multi-Device Live Sync**: Admin & employee accounts, chat stream communication, Kanban tasks, and email notifications sync live across all connected devices worldwide.
+3. **Interactive Deliverables Board**: Converts approved commitments into Kanban tasks (*To Do*, *In Progress*, *In Review*, *Completed*).
+4. **Milestone Risk Radar**: Proactively alerts teams to approaching cutoff dates with automated reminder triggers.
+5. **Role-Based Workspaces**: Dedicated privileges for **Administrator** and **Employee** members.
 
 ---
 
-## 🚀 Quickstart Guide
+## 👥 Registered Workspace Accounts
 
-### 1. Start the Local Server
+| Account | Email Address | Password | Role | Privileges |
+| :--- | :--- | :--- | :--- | :--- |
+| **Administrator (Root)** | `admin@meetpulse.ai` | `admin123` | Administrator | Full Admin, Employee Account Creation & Global Broadcast |
 
+*All employee accounts created by the Administrator are synchronized across the world in real time to the Global Cloud Database and can log in instantly from any device.*
+
+---
+
+## 🌐 Deployment & Live Hosting Options (Worldwide Access)
+
+### Option 1: Instant Worldwide Public HTTPS Live Link (Zero-Config)
+To get an instant live HTTPS URL to share with teammates anywhere in the world on mobile data or any Wi-Fi right now:
+```bash
+python tunnel.py
+```
+*Or with npm:*
+```bash
+npm run tunnel
+```
+Share the generated public HTTPS URL (e.g. `https://meetpulse-ai.loca.lt`) with anyone globally!
+
+---
+
+### Option 2: Deploy Free to Vercel (Cloud Serverless)
+1. Install Vercel CLI (or push to GitHub and import into [vercel.com](https://vercel.com)):
+   ```bash
+   npx vercel
+   ```
+2. Deploy to production:
+   ```bash
+   npx vercel --prod
+   ```
+*All `/api/*` endpoints (`/api/live-sync`, `/api/chat`, `/api/tasks`, `/api/emails`, `/api/users`, `/api/login`, `/api/analyze`, `/api/health`) are fully configured in `vercel.json`.*
+
+---
+
+### Option 3: Deploy Free to Render / Railway / Heroku
+1. Push repository to GitHub.
+2. Link your GitHub repository in [render.com](https://render.com) or [railway.app](https://railway.app).
+3. Render automatically detects `render.yaml` and `Procfile` and launches the live web service with persistent JSON storage.
+
+---
+
+### Option 4: Local Network / Wi-Fi Access
+Run on your local computer:
 ```bash
 python server.py
 ```
-
-Open your browser to:
-👉 **`http://localhost:5000`**
-
-### 2. Sign In
-
-- **Sign in as Administrator** (`admin@meetpulse.ai`) for full system controls.
-- **Sign in as Employee** (`alex@meetpulse.ai`) for staff deliverable tracking.
-
-### 3. Usage & Features
-
-1. **Live Meeting Stream**: Transcribe meeting audio or paste conversation logs. Click **"Scan & Extract Action Items"** to view interactive commitment cards directly in the stream.
-2. **Action Item Queue**: Review extracted deliverables with AI confidence scores and click **"Approve Deliverable"**.
-3. **Deliverables Board**: View Kanban sprint columns, drag and drop cards to update status, and trigger automated reminder nudges.
-4. **Milestone Risk Radar**: Monitor high-risk deliverables approaching cutoff dates.
-5. **Team Reliability**: Review team member reliability scores and add new members dynamically.
-6. **Plans & ROI Calculator**: Calculate monthly operational hours saved by preventing lost deliverables.
+- **Local Browser**: `http://localhost:5000`
+- **Other Devices on Wi-Fi/LAN**: `http://<YOUR_IP>:5000` (printed in terminal)
 
 ---
 
-## 📦 Project Structure
+## 📦 Architecture & Project Structure
 
 ```
 ├── api/
-│   └── analyze.js           # Vercel serverless function for AI extraction
+│   ├── analyze.js           # Serverless AI commitment extraction (Gemini / NLP)
+│   ├── chat.js              # Serverless real-time chat & stream broadcast
+│   ├── emails.js            # Serverless automated notification dispatch
+│   ├── health.js            # API health check endpoint
+│   ├── live-sync.js         # Full multi-device workspace sync endpoint
+│   ├── login.js             # Authentication endpoint
+│   ├── tasks.js             # Kanban board & inbox state endpoint
+│   └── users.js             # User directory & credential management
 ├── css/
-│   └── styles.css           # Pitch Black luxury dark theme design system
+│   └── styles.css           # Design system & responsive layout styles
+├── data/
+│   └── users.json           # Central user credential store
 ├── js/
-│   ├── app.js               # Main application orchestrator & auth manager
-│   ├── commitmentEngine.js  # NLP heuristic parser & Gemini LLM caller
+│   ├── app.js               # Main orchestrator & real-time live sync loop
+│   ├── commitmentEngine.js  # Heuristic NLP parser & Gemini LLM caller
 │   ├── inboxManager.js      # Action item queue manager
-│   ├── mockCommsData.js     # Default accounts & starter meeting streams
-│   └── taskManager.js       # Kanban board & milestone risk engine
-├── index.html               # Main application viewport & modals
-├── server.py                # Local development HTTP server
-└── README.md                # Project documentation
+│   ├── mockCommsData.js     # Default user schemas & initial state
+│   └── taskManager.js       # Kanban sprint board & risk radar engine
+├── index.html               # Main SPA viewport, modals & mobile nav dock
+├── server.py                # Central multi-device live sync server
+├── tunnel.py                # 1-click worldwide public live tunnel
+├── Procfile                 # Cloud container start definition
+├── render.yaml              # Render 1-click deploy blueprint
+├── vercel.json              # Vercel serverless routing configuration
+└── README.md                # Documentation & quickstart guide
 ```
-
----
-
-## 🔒 Security & Privacy
-
-Meetpulse operates with a client-side first architecture. Meeting audio and communication data can be processed entirely offline using local NLP heuristics or via secure, encrypted calls to Google Gemini.

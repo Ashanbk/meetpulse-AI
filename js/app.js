@@ -3,6 +3,7 @@ import { DEFAULT_USERS, PRELOADED_COMMS, INITIAL_CONFIRMED_TASKS } from './mockC
 import { CommitmentEngine } from './commitmentEngine.js';
 import { InboxManager } from './inboxManager.js';
 import { TaskManager } from './taskManager.js';
+import { globalCloudSync } from './cloudSync.js';
 
 class MeetPulseApp {
   constructor() {
@@ -32,6 +33,7 @@ class MeetPulseApp {
     this.bindEvents();
     this.loadChannel(0);
     this.setupRoiCalculator();
+    this.startLiveSync();
 
     window.commitPulseApp = this;
 
@@ -166,21 +168,303 @@ class MeetPulseApp {
 
   initUsers() {
     const storedUsers = localStorage.getItem('meetpulse_users_db');
+    let needsReset = false;
+
     if (storedUsers) {
       try {
-        this.registeredUsers = JSON.parse(storedUsers);
-        this.registeredUsers.forEach(u => {
-          if (!u.password) u.password = u.isAdmin ? 'admin123' : 'employee123';
-        });
+        const parsed = JSON.parse(storedUsers);
+        // If old mock employee "aashritha" is found, purge legacy cache to ensure clean state
+        if (Array.isArray(parsed) && parsed.some(u => u.email && u.email.toLowerCase() === 'aashritha@meetpulse.ai')) {
+          needsReset = true;
+        } else if (Array.isArray(parsed) && parsed.length > 0) {
+          this.registeredUsers = parsed;
+          this.registeredUsers.forEach(u => {
+            if (!u.password) u.password = u.isAdmin ? 'admin123' : 'employee123';
+          });
+        } else {
+          needsReset = true;
+        }
       } catch (e) {
-        this.registeredUsers = [...DEFAULT_USERS];
+        needsReset = true;
       }
     } else {
+      needsReset = true;
+    }
+
+    if (needsReset) {
       this.registeredUsers = [...DEFAULT_USERS];
       this.saveUsers();
     }
 
     this.commitmentEngine.setRegisteredUsers(this.registeredUsers);
+
+    // Immediately trigger background sync from Global Cloud DB
+    globalCloudSync.fetchUsers().then(cloudUsers => {
+      if (Array.isArray(cloudUsers) && cloudUsers.length > 0) {
+        const usersJson = JSON.stringify(cloudUsers);
+        if (usersJson !== JSON.stringify(this.registeredUsers)) {
+          this.registeredUsers = cloudUsers;
+          localStorage.setItem('meetpulse_users_db', usersJson);
+          this.commitmentEngine.setRegisteredUsers(this.registeredUsers);
+          this.renderRegisteredAccountsDeck();
+          this.populateTeamDropdowns();
+          this.renderTeamMembers();
+          this.updateDashboardKPIs();
+        }
+      }
+    }).catch(() => {});
+  }
+
+  startLiveSync() {
+    // 1. Start continuous Global Cloud Database Sync Loop (runs every 2.5s and on focus)
+    globalCloudSync.startSyncLoop(2500, (remoteState) => {
+      if (remoteState) {
+        this.handleLiveSyncData(remoteState);
+      }
+    });
+
+    // 2. Also poll local server / serverless endpoint as fallback
+    if (this.localSyncInterval) clearInterval(this.localSyncInterval);
+    this.localSyncInterval = setInterval(() => {
+      this.syncAllFromServer();
+    }, 4000);
+  }
+
+  handleLiveSyncData(data) {
+    if (!data || typeof data !== 'object') return;
+
+    // 1. Live Sync User Directory & Credentials
+    if (Array.isArray(data.users) && data.users.length > 0) {
+      const usersJson = JSON.stringify(data.users);
+      if (usersJson !== JSON.stringify(this.registeredUsers)) {
+        this.registeredUsers = data.users;
+        localStorage.setItem('meetpulse_users_db', usersJson);
+        this.commitmentEngine.setRegisteredUsers(this.registeredUsers);
+        this.renderRegisteredAccountsDeck();
+        this.populateTeamDropdowns();
+        this.renderTeamMembers();
+        this.updateDashboardKPIs();
+
+        if (this.currentUser) {
+          const updatedMe = this.registeredUsers.find(u => u.email.toLowerCase() === this.currentUser.email.toLowerCase());
+          if (updatedMe) {
+            this.currentUser = updatedMe;
+            localStorage.setItem('meetpulse_session', JSON.stringify(updatedMe));
+          }
+        }
+      }
+    }
+
+    // 2. Live Sync Meeting Stream & Team Chat Messages
+    if (Array.isArray(data.chat)) {
+      if (JSON.stringify(data.chat) !== JSON.stringify(this.communicationStreams)) {
+        const wasEmpty = this.communicationStreams.length === 0;
+        const prevLength = this.communicationStreams.length;
+        this.communicationStreams = data.chat;
+
+        if (this.activeViewId === 'view-chat') {
+          const container = document.getElementById('dynamicChatThread');
+          if (container) {
+            container.innerHTML = this.communicationStreams.map(s => this.buildStreamItemHTML(s)).join('');
+            const scrollContainer = document.getElementById('chatStreamContainer');
+            if (scrollContainer && (wasEmpty || data.chat.length > prevLength)) {
+              scrollContainer.scrollTop = scrollContainer.scrollHeight;
+            }
+          }
+        }
+      }
+    }
+
+    // 3. Live Sync Tasks & Deliverables Board
+    if (data.tasks) {
+      if (Array.isArray(data.tasks.tasks) && this.taskManager) {
+        const tasksJson = JSON.stringify(data.tasks.tasks);
+        if (tasksJson !== JSON.stringify(this.taskManager.getTasks())) {
+          this.taskManager.setTasks(data.tasks.tasks);
+          this.updateDashboardKPIs();
+          this.renderRadarRisks();
+          this.renderAnalytics();
+        }
+      }
+      if (Array.isArray(data.tasks.inbox) && this.inboxManager) {
+        const inboxJson = JSON.stringify(data.tasks.inbox);
+        if (inboxJson !== JSON.stringify(this.inboxManager.getCommitments())) {
+          this.inboxManager.setCommitments(data.tasks.inbox);
+          this.updateDashboardKPIs();
+        }
+      }
+    }
+
+    // 4. Live Sync Email Notifications
+    if (Array.isArray(data.emails)) {
+      const emailsJson = JSON.stringify(data.emails);
+      if (emailsJson !== JSON.stringify(this.scheduledEmails)) {
+        this.scheduledEmails = data.emails;
+        localStorage.setItem('meetpulse_scheduled_emails', emailsJson);
+        this.updateNotificationBadges();
+        this.renderEmailNotificationFeed();
+      }
+    }
+  }
+
+  async syncAllFromServer() {
+    try {
+      const res = await fetch('/api/live-sync');
+      if (!res.ok) return;
+      const data = await res.json();
+      this.handleLiveSyncData(data);
+    } catch (e) {
+      // Offline fallback
+    }
+  }
+
+  async syncUsersFromServer(showNotification = false) {
+    try {
+      // 1. Query Global Cloud Database first
+      const cloudUsers = await globalCloudSync.fetchUsers();
+      if (Array.isArray(cloudUsers) && cloudUsers.length > 0) {
+        this.registeredUsers = cloudUsers;
+        localStorage.setItem('meetpulse_users_db', JSON.stringify(this.registeredUsers));
+        this.commitmentEngine.setRegisteredUsers(this.registeredUsers);
+        this.renderRegisteredAccountsDeck();
+        this.populateTeamDropdowns();
+        this.renderTeamMembers();
+        this.updateDashboardKPIs();
+
+        if (showNotification) {
+          this.showToast(`Synced ${this.registeredUsers.length} account(s) from Global Cloud DB!`);
+        }
+        return this.registeredUsers;
+      }
+
+      // 2. Query serverless /api/users
+      const res = await fetch('/api/users');
+      if (res.ok) {
+        const serverUsers = await res.json();
+        if (Array.isArray(serverUsers) && serverUsers.length > 0) {
+          this.registeredUsers = serverUsers;
+          localStorage.setItem('meetpulse_users_db', JSON.stringify(this.registeredUsers));
+          this.commitmentEngine.setRegisteredUsers(this.registeredUsers);
+          this.renderRegisteredAccountsDeck();
+          this.populateTeamDropdowns();
+          this.renderTeamMembers();
+          this.updateDashboardKPIs();
+
+          if (showNotification) {
+            this.showToast(`Synced ${this.registeredUsers.length} employee accounts from server!`);
+          }
+          return this.registeredUsers;
+        }
+      }
+    } catch (e) {
+      console.log('Server sync offline, running in local storage mode.');
+    }
+    return this.registeredUsers;
+  }
+
+  async saveUserToServer(user) {
+    try {
+      await globalCloudSync.saveUser(user);
+    } catch (e) {}
+
+    try {
+      await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(user)
+      });
+    } catch (e) {}
+  }
+
+  async deleteUserFromServer(userId) {
+    try {
+      await globalCloudSync.deleteUser(userId);
+    } catch (e) {}
+
+    try {
+      await fetch(`/api/users/${encodeURIComponent(userId)}`, {
+        method: 'DELETE'
+      });
+    } catch (e) {}
+  }
+
+  async pushFullStateToServer() {
+    const fullState = {
+      users: this.registeredUsers,
+      chat: this.communicationStreams,
+      tasks: {
+        tasks: this.taskManager ? this.taskManager.getTasks() : [],
+        inbox: this.inboxManager ? this.inboxManager.getCommitments() : []
+      },
+      emails: this.scheduledEmails
+    };
+
+    try {
+      await globalCloudSync.pushFullState(fullState);
+    } catch (e) {}
+
+    try {
+      await fetch('/api/live-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fullState)
+      });
+    } catch (e) {}
+  }
+
+  async pushTasksToServer() {
+    this.pushFullStateToServer();
+  }
+
+  async pushEmailsToServer() {
+    this.pushFullStateToServer();
+  }
+
+  exportCredentialsJSON() {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.registeredUsers, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", "meetpulse_team_credentials.json");
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    this.showToast('Exported team credentials JSON successfully!');
+  }
+
+  importCredentialsJSON(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const imported = JSON.parse(e.target.result);
+        if (Array.isArray(imported)) {
+          const userMap = new Map();
+          DEFAULT_USERS.forEach(u => userMap.set(u.email.toLowerCase(), u));
+          this.registeredUsers.forEach(u => userMap.set(u.email.toLowerCase(), u));
+          imported.forEach(u => {
+            if (u.email) userMap.set(u.email.toLowerCase(), u);
+          });
+
+          this.registeredUsers = Array.from(userMap.values());
+          this.saveUsers();
+
+          for (const user of this.registeredUsers) {
+            await this.saveUserToServer(user);
+          }
+
+          this.populateTeamDropdowns();
+          this.renderTeamMembers();
+          this.renderRegisteredAccountsDeck();
+          this.updateDashboardKPIs();
+          this.showToast(`Successfully imported ${imported.length} employee accounts!`);
+        } else {
+          this.showToast('Invalid JSON file format. Expected a list of users.');
+        }
+      } catch (err) {
+        this.showToast('Failed to parse JSON file.');
+      }
+    };
+    reader.readAsText(file);
   }
 
   saveUsers() {
@@ -341,16 +625,23 @@ class MeetPulseApp {
     this.showToast(`Autofilled credentials for ${email}`);
   }
 
-  loginWithCredentials(email, password) {
+  async loginWithCredentials(email, password) {
     const trimmedEmail = (email || '').trim().toLowerCase();
     const trimmedPass = (password || '').trim();
-
-    const user = this.registeredUsers.find(u => u.email.toLowerCase() === trimmedEmail);
     const err = document.getElementById('loginErrorMessage');
+    if (err) err.style.display = 'none';
+
+    let user = this.registeredUsers.find(u => u.email.toLowerCase() === trimmedEmail);
+
+    // If user not in local memory or password differs, immediately query Global Cloud Database
+    if (!user || user.password !== trimmedPass) {
+      await this.syncUsersFromServer();
+      user = this.registeredUsers.find(u => u.email.toLowerCase() === trimmedEmail);
+    }
 
     if (!user) {
       if (err) {
-        err.textContent = `No account found for "${email}". Please enter valid credentials or contact your Administrator.`;
+        err.innerHTML = `No account found for "<strong>${email}</strong>". If an Admin just created this account on another device, click <em>"↻ Sync Cloud DB"</em> below to refresh.`;
         err.style.display = 'block';
       }
       return;
@@ -395,6 +686,7 @@ class MeetPulseApp {
 
     this.scheduledEmails.unshift(newEmail);
     this.saveEmails();
+    this.pushEmailsToServer();
     this.showToast(`Automated email sent to ${toEmail}: "${subject}"`);
   }
 
@@ -445,6 +737,12 @@ class MeetPulseApp {
     const sidebarBadge = document.getElementById('sidebarEmailBadge');
     if (sidebarBadge) {
       sidebarBadge.textContent = unreadCount;
+    }
+
+    const bottomNavEmailBadge = document.getElementById('bottomNavEmailBadge');
+    if (bottomNavEmailBadge) {
+      bottomNavEmailBadge.textContent = unreadCount;
+      bottomNavEmailBadge.style.display = unreadCount > 0 ? 'flex' : 'none';
     }
 
     const heroStat = document.getElementById('statHeroEmails');
@@ -553,6 +851,7 @@ class MeetPulseApp {
         this.scheduledEmails.unshift(newEmail);
       });
       this.saveEmails();
+      this.pushEmailsToServer();
       this.showToast(`Broadcasted email to all ${this.registeredUsers.length} team members!`);
     } else {
       // Send to specific individual
@@ -623,6 +922,9 @@ class MeetPulseApp {
     if (item) {
       item.isRead = true;
       this.saveEmails();
+      this.pushEmailsToServer();
+      this.renderEmailNotificationFeed();
+      this.updateNotificationBadges();
     }
   }
 
@@ -634,6 +936,9 @@ class MeetPulseApp {
       }
     });
     this.saveEmails();
+    this.pushEmailsToServer();
+    this.renderEmailNotificationFeed();
+    this.updateNotificationBadges();
     this.showToast('All notifications marked as read');
   }
 
@@ -660,6 +965,8 @@ class MeetPulseApp {
           taskId: task.id,
           triggerType: 'Task Assignment'
         });
+
+        this.pushFullStateToServer();
       },
       onCommitmentDismissed: (item) => {
         this.updateDashboardKPIs();
@@ -668,11 +975,13 @@ class MeetPulseApp {
         this.renderRadarRisks();
         this.updateInChatCardStatus(item.id, 'dismissed');
         this.showToast(`Dismissed commitment: "${item.taskTitle.substring(0, 30)}..."`);
+        this.pushTasksToServer();
       },
       onInboxUpdated: (stats) => {
         this.updateDashboardKPIs();
         this.renderAnalytics();
         this.renderRadarRisks();
+        this.pushTasksToServer();
       }
     });
 
@@ -685,6 +994,7 @@ class MeetPulseApp {
       this.renderAuditHistory();
       this.renderAnalytics();
       this.renderRadarRisks();
+      this.pushTasksToServer();
     });
 
     this.taskManager.setTasks([]);
@@ -698,6 +1008,11 @@ class MeetPulseApp {
       const email = document.getElementById('loginEmailInput')?.value;
       const password = document.getElementById('loginPasswordInput')?.value;
       this.loginWithCredentials(email, password);
+    });
+
+    // Sync Accounts from Server (Login Overlay)
+    document.getElementById('syncAccountsLoginBtn')?.addEventListener('click', () => {
+      this.syncUsersFromServer(true);
     });
 
     // Password Visibility Toggle
@@ -716,22 +1031,36 @@ class MeetPulseApp {
     document.getElementById('userProfileTrigger')?.addEventListener('click', () => this.logout());
 
     // Mobile Sidebar Drawer & Backdrop
-    const mobileToggle = document.getElementById('mobileSidebarToggle');
     const sidebar = document.getElementById('appSidebar');
     const backdrop = document.getElementById('sidebarBackdrop');
+    const sidebarCloseBtn = document.getElementById('sidebarCloseBtn');
 
     const openSidebar = () => {
       sidebar?.classList.add('sidebar-open');
       backdrop?.classList.add('active');
+      document.body.classList.add('sidebar-modal-open');
     };
 
     const closeSidebar = () => {
       sidebar?.classList.remove('sidebar-open');
       backdrop?.classList.remove('active');
+      document.body.classList.remove('sidebar-modal-open');
     };
 
-    if (mobileToggle) mobileToggle.addEventListener('click', openSidebar);
+    // Attach openSidebar to all mobile menu toggle buttons across all views
+    document.querySelectorAll('.mobile-menu-toggle, #mobileSidebarToggle, #bottomNavMenuTrigger').forEach(btn => {
+      btn.addEventListener('click', openSidebar);
+    });
+
+    if (sidebarCloseBtn) sidebarCloseBtn.addEventListener('click', closeSidebar);
     if (backdrop) backdrop.addEventListener('click', closeSidebar);
+
+    // Close on Escape key
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && sidebar?.classList.contains('sidebar-open')) {
+        closeSidebar();
+      }
+    });
 
     // Sidebar View Navigation
     document.querySelectorAll('.sidebar-item[data-view]').forEach(item => {
@@ -739,6 +1068,17 @@ class MeetPulseApp {
         const viewId = item.getAttribute('data-view');
         this.switchView(viewId);
         if (window.innerWidth <= 992) closeSidebar();
+      });
+    });
+
+    // Mobile Bottom Navigation Bar Triggers
+    document.querySelectorAll('.bottom-nav-item[data-view]').forEach(item => {
+      item.addEventListener('click', () => {
+        const viewId = item.getAttribute('data-view');
+        this.switchView(viewId);
+        if (sidebar?.classList.contains('sidebar-open')) {
+          closeSidebar();
+        }
       });
     });
 
@@ -812,6 +1152,7 @@ class MeetPulseApp {
     // Brand Home Trigger
     document.getElementById('brandHomeTrigger')?.addEventListener('click', () => {
       this.switchView('view-chat');
+      if (window.innerWidth <= 992) closeSidebar();
     });
 
     // Sidebar Channel Switcher
@@ -839,6 +1180,12 @@ class MeetPulseApp {
       });
     }
 
+    // Settings Modal Trigger
+    document.getElementById('openSettingsBtn')?.addEventListener('click', () => {
+      this.openSettingsModal();
+      if (window.innerWidth <= 992) closeSidebar();
+    });
+
     // Quick Action Queue Trigger
     document.getElementById('quickInboxBtn')?.addEventListener('click', () => {
       this.switchView('view-inbox');
@@ -852,6 +1199,7 @@ class MeetPulseApp {
       }
       this.switchView('view-analytics');
       this.openAddMemberModal();
+      if (window.innerWidth <= 992) closeSidebar();
     };
 
     document.getElementById('quickCreateEmpHeaderBtn')?.addEventListener('click', triggerEmpCreator);
@@ -861,7 +1209,10 @@ class MeetPulseApp {
 
     // Ingest Modals & Triggers
     document.getElementById('openIngestModalHeaderBtn')?.addEventListener('click', () => this.openIngestModal());
-    document.getElementById('openIngestModalBtn')?.addEventListener('click', () => this.openIngestModal());
+    document.getElementById('openIngestModalBtn')?.addEventListener('click', () => {
+      this.openIngestModal();
+      if (window.innerWidth <= 992) closeSidebar();
+    });
     document.getElementById('chipIngestMeeting')?.addEventListener('click', () => this.openIngestModal());
     document.getElementById('chipCheckRadar')?.addEventListener('click', () => this.switchView('view-radar'));
     document.getElementById('chipCustomPromise')?.addEventListener('click', () => {
@@ -894,6 +1245,7 @@ class MeetPulseApp {
     });
     document.getElementById('inboxConfirmAllBtn')?.addEventListener('click', () => {
       this.inboxManager.confirmAll();
+      this.pushTasksToServer();
       this.showToast('Approved all pending commitments to Deliverables Board');
     });
 
@@ -944,6 +1296,23 @@ class MeetPulseApp {
     document.getElementById('exportAuditCsvBtn')?.addEventListener('click', () => this.exportAuditCSV());
     document.getElementById('saveAddMemberBtn')?.addEventListener('click', () => this.saveAddMember());
 
+    // Team Directory Server Sync & JSON Export / Import
+    document.getElementById('syncTeamServerBtn')?.addEventListener('click', () => {
+      this.syncUsersFromServer(true);
+    });
+    document.getElementById('exportCredentialsBtn')?.addEventListener('click', () => {
+      this.exportCredentialsJSON();
+    });
+    document.getElementById('importCredentialsBtn')?.addEventListener('click', () => {
+      document.getElementById('importCredentialsFileInput')?.click();
+    });
+    document.getElementById('importCredentialsFileInput')?.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        this.importCredentialsJSON(e.target.files[0]);
+        e.target.value = '';
+      }
+    });
+
     // Inline Employee Creation Form in Team View (Admin Only)
     document.getElementById('inlineCreateEmployeeForm')?.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -985,6 +1354,14 @@ class MeetPulseApp {
         item.classList.add('active');
       } else {
         item.classList.remove('active');
+      }
+    });
+
+    document.querySelectorAll('.bottom-nav-item[data-view]').forEach(btn => {
+      if (btn.getAttribute('data-view') === viewId) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
       }
     });
 
@@ -1056,28 +1433,33 @@ class MeetPulseApp {
   }
 
   buildStreamItemHTML(stream) {
+    const isCurrentUser = Boolean(this.currentUser && stream.senderName && stream.senderName.toLowerCase() === this.currentUser.name.toLowerCase());
+    const isAudio = Boolean(stream.sourceType && (stream.sourceType.toLowerCase().includes('audio') || stream.sourceType.toLowerCase().includes('transcript')));
+
     let threadHtml = `
-      <div class="chat-message-group msg-other">
-        <div class="avatar-initials">${stream.senderAvatar || 'MS'}</div>
+      <div class="chat-message-group ${isCurrentUser ? 'msg-user' : 'msg-other'}">
+        <div class="avatar-initials">${stream.senderAvatar || 'TM'}</div>
         <div class="chat-bubble-content" style="width: 100%;">
           <div class="chat-sender-header">
-            <span class="chat-sender-name">${stream.channelName}</span>
+            <span class="chat-sender-name">${stream.channelName || stream.senderName || 'Team Member'}</span>
             <span class="chat-timestamp">${stream.timestamp}</span>
-            <span class="chat-source-tag">${stream.sourceType}</span>
+            <span class="chat-source-tag">${stream.sourceType || 'Live Stream'}</span>
           </div>
           <div class="chat-bubble">
-            <div class="audio-waveform-deck">
-              <span style="font-size: 0.78rem; font-weight: 700; color: var(--color-primary);">Audio Stream Recorded:</span>
-              <div class="waveform-bars">
-                <div class="waveform-bar" style="animation-delay: 0.1s;"></div>
-                <div class="waveform-bar" style="animation-delay: 0.3s;"></div>
-                <div class="waveform-bar" style="animation-delay: 0.2s;"></div>
-                <div class="waveform-bar" style="animation-delay: 0.4s;"></div>
-                <div class="waveform-bar" style="animation-delay: 0.15s;"></div>
+            ${isAudio ? `
+              <div class="audio-waveform-deck">
+                <span style="font-size: 0.78rem; font-weight: 700; color: var(--color-primary);">Audio Stream Recorded:</span>
+                <div class="waveform-bars">
+                  <div class="waveform-bar" style="animation-delay: 0.1s;"></div>
+                  <div class="waveform-bar" style="animation-delay: 0.3s;"></div>
+                  <div class="waveform-bar" style="animation-delay: 0.2s;"></div>
+                  <div class="waveform-bar" style="animation-delay: 0.4s;"></div>
+                  <div class="waveform-bar" style="animation-delay: 0.15s;"></div>
+                </div>
+                <span style="font-size: 0.72rem; color: var(--text-muted); margin-left: auto;">Duration: 18m 40s</span>
               </div>
-              <span style="font-size: 0.72rem; color: var(--text-muted); margin-left: auto;">Duration: 18m 40s</span>
-            </div>
-            <div style="line-height: 1.6; font-size: 0.88rem; white-space: pre-wrap;">${this.escapeHtml(stream.rawContent)}</div>
+            ` : ''}
+            <div style="line-height: 1.6; font-size: 0.88rem; white-space: pre-wrap;">${this.escapeHtml(stream.rawContent || '')}</div>
           </div>
         </div>
       </div>
@@ -1231,32 +1613,8 @@ class MeetPulseApp {
     const source = sourceSelect ? sourceSelect.value : 'Direct Entry';
     input.value = '';
 
-    const container = document.getElementById('dynamicChatThread');
-    if (!container) return;
-
-    const emptyCard = container.querySelector('.empty-stream-card');
-    if (emptyCard) emptyCard.remove();
-
     const userName = this.currentUser ? this.currentUser.name : 'Team Member';
     const userAvatar = this.currentUser ? this.currentUser.avatar : 'TM';
-
-    const userMsgHTML = `
-      <div class="chat-message-group msg-user">
-        <div class="avatar-initials">${userAvatar}</div>
-        <div class="chat-bubble-content">
-          <div class="chat-sender-header">
-            <span class="chat-sender-name">${userName}</span>
-            <span class="chat-timestamp">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-            <span class="chat-source-tag">${source}</span>
-          </div>
-          <div class="chat-bubble">${this.escapeHtml(userText)}</div>
-        </div>
-      </div>
-    `;
-    container.insertAdjacentHTML('beforeend', userMsgHTML);
-
-    const scrollContainer = document.getElementById('chatStreamContainer');
-    if (scrollContainer) scrollContainer.scrollTop = scrollContainer.scrollHeight;
 
     this.showToast('Analyzing text with Meetpulse NLP Engine...');
 
@@ -1267,55 +1625,45 @@ class MeetPulseApp {
       sender: userName
     });
 
+    const newStreamItem = {
+      id: `stream-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      channelName: `${userName} (${this.currentUser ? this.currentUser.role : 'Member'})`,
+      senderName: userName,
+      senderAvatar: userAvatar,
+      sourceType: source,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      rawContent: userText,
+      detectedCommitments: extracted || []
+    };
+
+    this.communicationStreams.push(newStreamItem);
+
     if (extracted && extracted.length > 0) {
       this.inboxManager.addCommitments(extracted);
-
-      setTimeout(() => {
-        const aiResponseHTML = `
-          <div class="chat-message-group msg-ai">
-            <div class="avatar-initials">MP</div>
-            <div class="chat-bubble-content" style="width: 100%;">
-              <div class="chat-sender-header">
-                <span class="chat-sender-name" style="color: var(--color-primary);">Meetpulse AI</span>
-                <span class="chat-timestamp">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                <span class="chat-source-tag">Detected ${extracted.length} Action Items</span>
-              </div>
-              <div class="chat-bubble">
-                <div style="font-weight: 700; font-size: 0.88rem; margin-bottom: 0.5rem;">
-                  Detected ${extracted.length} commitment(s) from your input. Click <strong>Approve Deliverable</strong> to confirm:
-                </div>
-                <div class="inchat-commitment-deck">
-                  ${extracted.map(item => this.buildInChatCommitmentCardHTML(item)).join('')}
-                </div>
-              </div>
-            </div>
-          </div>
-        `;
-        container.insertAdjacentHTML('beforeend', aiResponseHTML);
-        if (scrollContainer) scrollContainer.scrollTop = scrollContainer.scrollHeight;
-        this.showToast(`Extracted ${extracted.length} action items added to Action Queue`);
-      }, 400);
-
-    } else {
-      setTimeout(() => {
-        const aiResponseHTML = `
-          <div class="chat-message-group msg-ai">
-            <div class="avatar-initials">MP</div>
-            <div class="chat-bubble-content">
-              <div class="chat-sender-header">
-                <span class="chat-sender-name" style="color: var(--color-primary);">Meetpulse AI</span>
-                <span class="chat-timestamp">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-              </div>
-              <div class="chat-bubble">
-                <p>Scanned your message. No explicit action items, deadlines, or deliverables detected. Try phrases like <em>"Please deliver..."</em> or <em>"I will complete by Friday"</em>.</p>
-              </div>
-            </div>
-          </div>
-        `;
-        container.insertAdjacentHTML('beforeend', aiResponseHTML);
-        if (scrollContainer) scrollContainer.scrollTop = scrollContainer.scrollHeight;
-      }, 350);
     }
+
+    this.pushFullStateToServer();
+
+    const container = document.getElementById('dynamicChatThread');
+    if (container) {
+      container.innerHTML = this.communicationStreams.map(s => this.buildStreamItemHTML(s)).join('');
+    }
+
+    const scrollContainer = document.getElementById('chatStreamContainer');
+    if (scrollContainer) scrollContainer.scrollTop = scrollContainer.scrollHeight;
+
+    if (extracted && extracted.length > 0) {
+      this.showToast(`Extracted ${extracted.length} action items added to Action Queue`);
+    }
+
+    // Broadcast stream item to server so all devices receive it live
+    try {
+      await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newStreamItem)
+      });
+    } catch (e) {}
   }
 
   updateDashboardKPIs() {
@@ -1330,11 +1678,29 @@ class MeetPulseApp {
     const sidebarInboxBadge = document.getElementById('sidebarInboxBadge');
     if (sidebarInboxBadge) sidebarInboxBadge.textContent = inboxStats.pendingCount;
 
+    const bottomNavInboxBadge = document.getElementById('bottomNavInboxBadge');
+    if (bottomNavInboxBadge) {
+      bottomNavInboxBadge.textContent = inboxStats.pendingCount;
+      bottomNavInboxBadge.style.display = inboxStats.pendingCount > 0 ? 'flex' : 'none';
+    }
+
     const sidebarTasksBadge = document.getElementById('sidebarTasksBadge');
     if (sidebarTasksBadge) sidebarTasksBadge.textContent = taskStats.total;
 
+    const bottomNavTasksBadge = document.getElementById('bottomNavTasksBadge');
+    if (bottomNavTasksBadge) {
+      bottomNavTasksBadge.textContent = taskStats.total;
+      bottomNavTasksBadge.style.display = taskStats.total > 0 ? 'flex' : 'none';
+    }
+
     const sidebarRisksBadge = document.getElementById('sidebarRisksBadge');
     if (sidebarRisksBadge) sidebarRisksBadge.textContent = taskStats.forgottenRisks;
+
+    const bottomNavRadarBadge = document.getElementById('bottomNavRadarBadge');
+    if (bottomNavRadarBadge) {
+      bottomNavRadarBadge.textContent = taskStats.forgottenRisks;
+      bottomNavRadarBadge.style.display = taskStats.forgottenRisks > 0 ? 'flex' : 'none';
+    }
 
     const sidebarEmployeesCount = document.getElementById('sidebarEmployeesCount');
     if (sidebarEmployeesCount) sidebarEmployeesCount.textContent = this.registeredUsers.length;
@@ -1521,7 +1887,7 @@ class MeetPulseApp {
   }
 
   deleteEmployee(userId) {
-    const userToDelete = this.registeredUsers.find(u => u.id === userId);
+    const userToDelete = this.registeredUsers.find(u => u.id === userId || u.email === userId);
     if (!userToDelete) return;
 
     if (userToDelete.isAdmin || userToDelete.role === 'Administrator') {
@@ -1529,14 +1895,16 @@ class MeetPulseApp {
       return;
     }
 
-    this.registeredUsers = this.registeredUsers.filter(u => u.id !== userId);
+    this.registeredUsers = this.registeredUsers.filter(u => u.id !== userToDelete.id && u.email !== userToDelete.email);
     this.saveUsers();
+    this.deleteUserFromServer(userToDelete.id || userToDelete.email);
+    this.pushFullStateToServer();
     this.populateTeamDropdowns();
     this.renderTeamMembers();
     this.renderRegisteredAccountsDeck();
     this.renderAnalytics();
     this.updateDashboardKPIs();
-    this.showToast(`Deleted employee account: ${userToDelete.name} (${userToDelete.email})`);
+    this.showToast(`Deleted employee account: ${userToDelete.name} (${userToDelete.email}) - Synced globally.`);
   }
 
   renderAuditHistory() {
@@ -1630,6 +1998,8 @@ class MeetPulseApp {
 
     this.registeredUsers.push(newMember);
     this.saveUsers();
+    this.saveUserToServer(newMember);
+    this.pushFullStateToServer();
     this.populateTeamDropdowns();
     this.renderTeamMembers();
     this.renderAnalytics();
@@ -1640,11 +2010,11 @@ class MeetPulseApp {
       toEmail: email,
       toName: name,
       subject: 'Welcome to Meetpulse — Your Account Credentials',
-      body: `Hello ${name},\n\nYour employee account has been created by your Administrator.\n\nLogin Email: ${email}\nPassword: ${newMember.password}\nWorkspace Role: ${newMember.role}\n\nPlease sign in at http://localhost:5000 or production URL to track your meeting commitments and deliverables.`,
+      body: `Hello ${name},\n\nYour employee account has been created by your Administrator.\n\nLogin Email: ${email}\nPassword: ${newMember.password}\nWorkspace Role: ${newMember.role}\n\nPlease sign in on any device across the globe to track your meeting commitments and deliverables.`,
       triggerType: 'Account Registration'
     });
 
-    this.showToast(`Created account for ${name} (${email}). Password: ${newMember.password}`);
+    this.showToast(`Created account for ${name} (${email}). Synced to Global Cloud DB across all devices!`);
   }
 
   saveAddMember() {
@@ -1738,6 +2108,15 @@ class MeetPulseApp {
 
     this.communicationStreams.unshift(newStream);
     this.inboxManager.addCommitments(extracted);
+    this.pushTasksToServer();
+
+    try {
+      await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newStream)
+      });
+    } catch (e) {}
 
     this.loadChannel(0);
     this.showToast(`Extracted ${extracted.length} action items added to Action Queue`);

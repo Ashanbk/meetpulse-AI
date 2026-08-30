@@ -103,8 +103,7 @@ export class CommitmentEngine {
     let idCounter = Date.now();
 
     const teamNames = this.registeredUsers.length > 0 ? this.registeredUsers : [
-      { name: "Admin User", alias: ["admin", "lead", "@admin"], role: "Administrator", avatar: "AD" },
-      { name: "Alex Taylor", alias: ["alex", "staff", "@alex"], role: "Staff Member", avatar: "AT" }
+      { name: "Administrator", alias: ["admin", "lead", "@admin"], role: "Administrator", avatar: "AD" }
     ];
 
     const commitmentPatterns = [
@@ -199,10 +198,10 @@ export class CommitmentEngine {
       commitments.push({
         id: `com-${idCounter++}`,
         taskTitle: sampleLine.length > 70 ? sampleLine.substring(0, 67) + "..." : sampleLine,
-        owner: sender || "Alex Taylor",
-        ownerAvatar: sender ? sender.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : "AT",
-        ownerRole: "Staff Member",
-        requester: sender || "Lead",
+        owner: sender || "Administrator",
+        ownerAvatar: sender ? sender.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : "AD",
+        ownerRole: sender === "Administrator" ? "Administrator" : "Team Member",
+        requester: sender || "Administrator",
         deadline: deadlineInfo.label,
         deadlineISO: deadlineInfo.iso,
         priority: "Medium",
