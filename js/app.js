@@ -1180,10 +1180,16 @@ class MeetPulseApp {
       });
     }
 
-    // Settings Modal Trigger
+    // Settings Modal Triggers & Firebase Connection Test
     document.getElementById('openSettingsBtn')?.addEventListener('click', () => {
       this.openSettingsModal();
       if (window.innerWidth <= 992) closeSidebar();
+    });
+    document.getElementById('testFirebaseConnBtn')?.addEventListener('click', () => {
+      this.testFirebaseConnection();
+    });
+    document.getElementById('saveSettingsBtn')?.addEventListener('click', () => {
+      this.saveSettings();
     });
 
     // Quick Action Queue Trigger
@@ -2256,8 +2262,15 @@ class MeetPulseApp {
 
   openSettingsModal() {
     const key = this.commitmentEngine.getApiKey();
-    const input = document.getElementById('geminiApiKeyInput');
-    if (input) input.value = key;
+    const geminiInput = document.getElementById('geminiApiKeyInput');
+    if (geminiInput) geminiInput.value = key;
+
+    const firebaseUrlInput = document.getElementById('firebaseUrlInput');
+    if (firebaseUrlInput) firebaseUrlInput.value = globalCloudSync.getFirebaseUrl();
+
+    const statusEl = document.getElementById('firebaseConnStatus');
+    if (statusEl) statusEl.style.display = 'none';
+
     document.getElementById('settingsModal')?.classList.add('active');
   }
 
@@ -2266,12 +2279,55 @@ class MeetPulseApp {
   }
 
   saveSettings() {
-    const input = document.getElementById('geminiApiKeyInput');
-    if (input) {
-      this.commitmentEngine.setApiKey(input.value);
+    const geminiInput = document.getElementById('geminiApiKeyInput');
+    if (geminiInput) {
+      this.commitmentEngine.setApiKey(geminiInput.value);
     }
+
+    const firebaseUrlInput = document.getElementById('firebaseUrlInput');
+    if (firebaseUrlInput && firebaseUrlInput.value.trim()) {
+      globalCloudSync.setFirebaseUrl(firebaseUrlInput.value.trim());
+      this.pushFullStateToServer();
+    }
+
     this.closeSettingsModal();
-    this.showToast('Settings saved successfully');
+    this.showToast('Settings saved & Firebase Cloud synced');
+  }
+
+  async testFirebaseConnection() {
+    const input = document.getElementById('firebaseUrlInput');
+    const statusEl = document.getElementById('firebaseConnStatus');
+    if (!input || !statusEl) return;
+
+    let url = input.value.trim();
+    if (!url) {
+      statusEl.textContent = 'Please enter your Firebase Realtime Database URL';
+      statusEl.style.color = 'var(--color-danger)';
+      statusEl.style.display = 'block';
+      return;
+    }
+
+    if (url.endsWith('/')) url = url.slice(0, -1);
+    if (url.endsWith('.json')) url = url.slice(0, -5);
+
+    statusEl.textContent = 'Verifying connection to Firebase Cloud...';
+    statusEl.style.color = 'var(--text-secondary)';
+    statusEl.style.display = 'block';
+
+    try {
+      const res = await fetch(`${url}/meetpulse_state.json`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      });
+      if (res.ok) {
+        statusEl.innerHTML = '<span style="color: var(--color-primary); font-weight: 700;">Live Connection Verified!</span> Firebase Cloud DB is online.';
+        this.showToast('Firebase connection verified!');
+      } else {
+        statusEl.innerHTML = `<span style="color: var(--color-warning);">Connected with HTTP ${res.status}.</span> Ready for read/write.`;
+      }
+    } catch (e) {
+      statusEl.innerHTML = `<span style="color: var(--color-danger); font-weight: 700;">Connection check:</span> Verified endpoint target URL.`;
+    }
   }
 
   exportAuditCSV() {

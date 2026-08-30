@@ -1,5 +1,5 @@
-// sw.js - Meetpulse PWA Service Worker (Vercel & GitHub Pages compatible with Dynamic Cloud DB Bypass)
-const CACHE_NAME = 'meetpulse-cache-v5';
+// sw.js - Meetpulse PWA Service Worker (Firebase Realtime Cloud & Vercel compatible)
+const CACHE_NAME = 'meetpulse-cache-v6';
 
 const PRECACHE_ASSETS = [
   'index.html',
@@ -39,12 +39,13 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Bypass cache completely for all API and cloud sync requests
+  // Bypass cache completely for all API and Firebase Realtime Cloud requests
   if (
     event.request.method !== 'GET' ||
     url.pathname.startsWith('/api/') ||
-    url.hostname.includes('restful-api.dev') ||
     url.hostname.includes('firebaseio.com') ||
+    url.hostname.includes('firebasedatabase.app') ||
+    url.hostname.includes('restful-api.dev') ||
     url.hostname.includes('supabase.co')
   ) {
     return;
