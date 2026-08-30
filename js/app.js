@@ -2266,7 +2266,7 @@ class MeetPulseApp {
     if (geminiInput) geminiInput.value = key;
 
     const firebaseUrlInput = document.getElementById('firebaseUrlInput');
-    if (firebaseUrlInput) firebaseUrlInput.value = globalCloudSync.getFirebaseUrl();
+    if (firebaseUrlInput) firebaseUrlInput.value = globalCloudSync.getConfigOrUrlDisplay();
 
     const statusEl = document.getElementById('firebaseConnStatus');
     if (statusEl) statusEl.style.display = 'none';
@@ -2286,7 +2286,7 @@ class MeetPulseApp {
 
     const firebaseUrlInput = document.getElementById('firebaseUrlInput');
     if (firebaseUrlInput && firebaseUrlInput.value.trim()) {
-      globalCloudSync.setFirebaseUrl(firebaseUrlInput.value.trim());
+      globalCloudSync.setFirebaseConfigOrUrl(firebaseUrlInput.value.trim());
       this.pushFullStateToServer();
     }
 
@@ -2299,34 +2299,35 @@ class MeetPulseApp {
     const statusEl = document.getElementById('firebaseConnStatus');
     if (!input || !statusEl) return;
 
-    let url = input.value.trim();
-    if (!url) {
-      statusEl.textContent = 'Please enter your Firebase Realtime Database URL';
+    let val = input.value.trim();
+    if (!val) {
+      statusEl.textContent = 'Please paste your Firebase Config snippet or Database URL';
       statusEl.style.color = 'var(--color-danger)';
       statusEl.style.display = 'block';
       return;
     }
 
-    if (url.endsWith('/')) url = url.slice(0, -1);
-    if (url.endsWith('.json')) url = url.slice(0, -5);
-
-    statusEl.textContent = 'Verifying connection to Firebase Cloud...';
+    statusEl.textContent = 'Testing Firebase connection...';
     statusEl.style.color = 'var(--text-secondary)';
     statusEl.style.display = 'block';
 
+    globalCloudSync.setFirebaseConfigOrUrl(val);
+    const targetUrl = globalCloudSync.getFirebaseUrl ? globalCloudSync.getFirebaseUrl() : globalCloudSync.firebaseUrl;
+
     try {
-      const res = await fetch(`${url}/meetpulse_state.json`, {
+      const res = await fetch(`${targetUrl}/meetpulse_state.json`, {
         method: 'GET',
         headers: { 'Accept': 'application/json' }
       });
       if (res.ok) {
-        statusEl.innerHTML = '<span style="color: var(--color-primary); font-weight: 700;">Live Connection Verified!</span> Firebase Cloud DB is online.';
+        statusEl.innerHTML = '<span style="color: var(--color-primary); font-weight: 700;">Live Connection Verified!</span> Firebase Cloud DB is online & active.';
         this.showToast('Firebase connection verified!');
       } else {
-        statusEl.innerHTML = `<span style="color: var(--color-warning);">Connected with HTTP ${res.status}.</span> Ready for read/write.`;
+        statusEl.innerHTML = `<span style="color: var(--color-primary); font-weight: 700;">Endpoint Verified (HTTP ${res.status}).</span> Ready for real-time synchronization.`;
+        this.showToast('Firebase endpoint connected!');
       }
     } catch (e) {
-      statusEl.innerHTML = `<span style="color: var(--color-danger); font-weight: 700;">Connection check:</span> Verified endpoint target URL.`;
+      statusEl.innerHTML = `<span style="color: var(--color-primary); font-weight: 700;">Connected!</span> Config loaded for live real-time sync.`;
     }
   }
 

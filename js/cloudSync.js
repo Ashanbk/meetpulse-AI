@@ -1,24 +1,88 @@
-// js/cloudSync.js - Worldwide Real-Time Firebase Cloud Database Synchronizer
-// Enables instant sub-millisecond cross-device account creation, live meeting stream synchronization,
-// real-time Kanban task replication, and automated email notifications across all devices globally.
+// js/cloudSync.js - Worldwide Real-Time Firebase Cloud Database Synchronizer & SDK Engine
+// Supports Official Firebase SDK (v10) + Server-Sent Events (SSE) + REST Realtime Sync
 
 const DEFAULT_FIREBASE_URL = "https://meetpulse-ai-cloud-default-rtdb.firebaseio.com";
 
 export class CloudSyncEngine {
   constructor() {
-    this.firebaseUrl = this.sanitizeUrl(localStorage.getItem("meetpulse_firebase_url") || DEFAULT_FIREBASE_URL);
-    this.isOnline = navigator.onLine;
-    this.syncInterval = null;
+    this.firebaseConfig = null;
+    this.firebaseUrl = DEFAULT_FIREBASE_URL;
+    this.dbRef = null;
+    this.firebaseApp = null;
     this.eventSource = null;
+    this.syncInterval = null;
     this.onUpdateCallback = null;
+    this.isOnline = navigator.onLine;
     this.isSyncing = false;
     this.status = "connected"; // 'connected' | 'syncing' | 'offline'
     this.lastLocalUpdateTime = Date.now();
     this.pendingPushTimeout = null;
     this.cachedState = null;
 
+    this.loadStoredConfig();
     this.initNetworkListeners();
-    this.initRealtimeStream();
+    this.initFirebase();
+  }
+
+  loadStoredConfig() {
+    const raw = localStorage.getItem("meetpulse_firebase_config") || localStorage.getItem("meetpulse_firebase_url") || "";
+    this.parseAndSetConfig(raw);
+  }
+
+  parseAndSetConfig(rawInput) {
+    if (!rawInput || !rawInput.trim()) {
+      this.firebaseUrl = DEFAULT_FIREBASE_URL;
+      this.firebaseConfig = null;
+      return;
+    }
+
+    const input = rawInput.trim();
+
+    // 1. Check if input is a JSON object or JS snippet (const firebaseConfig = { ... })
+    if (input.includes("{") && input.includes("}")) {
+      try {
+        let jsonStr = input;
+        // Strip JS variable assignment if present (e.g. const firebaseConfig = { ... };)
+        const match = input.match(/\{[\s\S]*\}/);
+        if (match) {
+          jsonStr = match[0];
+        }
+        // Convert JS object keys without quotes to valid JSON
+        jsonStr = jsonStr.replace(/(['"])?([a-zA-Z0-9_]+)(['"])?:/g, '"$2":').replace(/'/g, '"');
+        const parsed = JSON.parse(jsonStr);
+
+        if (parsed && typeof parsed === "object") {
+          this.firebaseConfig = parsed;
+          if (parsed.databaseURL) {
+            this.firebaseUrl = this.sanitizeUrl(parsed.databaseURL);
+          } else if (parsed.projectId) {
+            this.firebaseUrl = `https://${parsed.projectId}-default-rtdb.firebaseio.com`;
+          }
+          localStorage.setItem("meetpulse_firebase_config", JSON.stringify(parsed));
+          return;
+        }
+      } catch (e) {
+        // Fallback to regex extraction
+        const dbUrlMatch = input.match(/databaseURL\s*:\s*["']([^"']+)["']/i);
+        const projIdMatch = input.match(/projectId\s*:\s*["']([^"']+)["']/i);
+        const apiKeyMatch = input.match(/apiKey\s*:\s*["']([^"']+)["']/i);
+
+        if (dbUrlMatch || projIdMatch) {
+          this.firebaseConfig = {
+            apiKey: apiKeyMatch ? apiKeyMatch[1] : "",
+            projectId: projIdMatch ? projIdMatch[1] : "",
+            databaseURL: dbUrlMatch ? dbUrlMatch[1] : (projIdMatch ? `https://${projIdMatch[1]}-default-rtdb.firebaseio.com` : "")
+          };
+          this.firebaseUrl = this.sanitizeUrl(this.firebaseConfig.databaseURL);
+          localStorage.setItem("meetpulse_firebase_config", JSON.stringify(this.firebaseConfig));
+          return;
+        }
+      }
+    }
+
+    // 2. Otherwise treat input as raw Database URL
+    this.firebaseUrl = this.sanitizeUrl(input);
+    localStorage.setItem("meetpulse_firebase_url", this.firebaseUrl);
   }
 
   sanitizeUrl(url) {
@@ -30,29 +94,31 @@ export class CloudSyncEngine {
     return clean;
   }
 
-  setFirebaseUrl(url) {
-    this.firebaseUrl = this.sanitizeUrl(url);
-    localStorage.setItem("meetpulse_firebase_url", this.firebaseUrl);
-    this.initRealtimeStream();
+  setFirebaseConfigOrUrl(input) {
+    this.parseAndSetConfig(input);
+    this.initFirebase();
     this.fetchFullState();
   }
 
-  getFirebaseUrl() {
-    return this.firebaseUrl;
+  getConfigOrUrlDisplay() {
+    if (this.firebaseConfig) {
+      return JSON.stringify(this.firebaseConfig, null, 2);
+    }
+    return this.firebaseUrl || DEFAULT_FIREBASE_URL;
   }
 
   initNetworkListeners() {
     window.addEventListener("online", () => {
       this.isOnline = true;
       this.updateStatusBadge("connected", "Online (Firebase Cloud Connected)");
-      this.initRealtimeStream();
+      this.initFirebase();
       this.fetchFullState();
     });
 
     window.addEventListener("offline", () => {
       this.isOnline = false;
       this.updateStatusBadge("offline", "Offline (Local Cache Mode)");
-      this.closeRealtimeStream();
+      this.closeListeners();
     });
   }
 
@@ -73,10 +139,48 @@ export class CloudSyncEngine {
     }
   }
 
-  // 1. Real-Time Server-Sent Events (SSE) Live Stream Listener
-  initRealtimeStream() {
-    this.closeRealtimeStream();
+  // Initialize Firebase (SDK WebSocket if config available, else SSE Stream)
+  initFirebase() {
+    this.closeListeners();
 
+    // 1. Try initializing Official Firebase SDK
+    if (window.FirebaseSDK && this.firebaseConfig && this.firebaseConfig.apiKey) {
+      try {
+        const { initializeApp, getApps, getDatabase, ref, onValue } = window.FirebaseSDK;
+        const apps = getApps();
+        this.firebaseApp = apps.length > 0 ? apps[0] : initializeApp(this.firebaseConfig);
+        const db = getDatabase(this.firebaseApp);
+        this.dbRef = ref(db, "meetpulse_state");
+
+        onValue(this.dbRef, (snapshot) => {
+          const data = snapshot.val();
+          if (data && typeof data === "object") {
+            if (!data.updatedAt || data.updatedAt >= this.lastLocalUpdateTime - 500) {
+              this.cachedState = data;
+              if (this.onUpdateCallback) {
+                this.onUpdateCallback(data);
+              }
+              this.updateStatusBadge("connected", "Firebase Realtime SDK Live");
+            }
+          }
+        }, (error) => {
+          console.warn("Firebase SDK onValue note:", error);
+          this.initSseStream();
+        });
+
+        console.log("Firebase Official SDK Initialized successfully");
+        this.updateStatusBadge("connected", "Firebase SDK Connected");
+        return;
+      } catch (err) {
+        console.warn("Firebase SDK init fallback to SSE:", err);
+      }
+    }
+
+    // 2. Fallback to SSE Stream over REST
+    this.initSseStream();
+  }
+
+  initSseStream() {
     if (!window.EventSource || !this.firebaseUrl) return;
 
     try {
@@ -88,7 +192,6 @@ export class CloudSyncEngine {
           const payload = JSON.parse(e.data);
           const data = payload?.data;
           if (data && typeof data === "object") {
-            // Check if this update came from another client
             if (!data.updatedAt || data.updatedAt >= this.lastLocalUpdateTime - 500) {
               this.cachedState = data;
               if (this.onUpdateCallback) {
@@ -114,23 +217,39 @@ export class CloudSyncEngine {
       });
 
       this.eventSource.onerror = () => {
-        // Fallback to polling if SSE is restricted on specific networks
-        this.updateStatusBadge("connected", "Connected via Firebase REST API");
+        this.updateStatusBadge("connected", "Firebase REST Sync Active");
       };
     } catch (e) {
-      console.warn("Firebase SSE stream initialization note:", e);
+      console.warn("Firebase SSE stream note:", e);
     }
   }
 
-  closeRealtimeStream() {
+  closeListeners() {
     if (this.eventSource) {
       this.eventSource.close();
       this.eventSource = null;
     }
   }
 
-  // 2. Fetch Users from Firebase Cloud DB with Fallbacks
+  // Fetch Users from Firebase Cloud DB with Multi-Tier Fallback
   async fetchUsers() {
+    // 1. Try Firebase SDK
+    if (window.FirebaseSDK && this.firebaseApp) {
+      try {
+        const { getDatabase, ref, get } = window.FirebaseSDK;
+        const db = getDatabase(this.firebaseApp);
+        const snapshot = await get(ref(db, "meetpulse_state/users"));
+        if (snapshot.exists()) {
+          const users = snapshot.val();
+          if (Array.isArray(users) && users.length > 0) {
+            localStorage.setItem("meetpulse_users_db", JSON.stringify(users));
+            return users;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 2. Try REST Endpoint
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -150,11 +269,9 @@ export class CloudSyncEngine {
           return users;
         }
       }
-    } catch (e) {
-      console.warn("Firebase fetch users note:", e);
-    }
+    } catch (e) {}
 
-    // Secondary fallback to serverless / Python server /api/users
+    // 3. Fallback to /api/users
     try {
       const apiRes = await fetch("/api/users");
       if (apiRes.ok) {
@@ -166,7 +283,7 @@ export class CloudSyncEngine {
       }
     } catch (e) {}
 
-    // Tertiary fallback: localStorage
+    // 4. LocalStorage
     try {
       const stored = localStorage.getItem("meetpulse_users_db");
       if (stored) return JSON.parse(stored);
@@ -175,11 +292,30 @@ export class CloudSyncEngine {
     return null;
   }
 
-  // 3. Fetch Full Global Workspace State (Users, Chat, Tasks, Emails)
+  // Fetch Full Global Workspace State
   async fetchFullState() {
     if (this.isSyncing) return this.cachedState;
     this.isSyncing = true;
 
+    // 1. Try Firebase SDK
+    if (window.FirebaseSDK && this.firebaseApp) {
+      try {
+        const { getDatabase, ref, get } = window.FirebaseSDK;
+        const db = getDatabase(this.firebaseApp);
+        const snapshot = await get(ref(db, "meetpulse_state"));
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          if (data && typeof data === "object") {
+            this.cachedState = data;
+            this.isSyncing = false;
+            this.updateStatusBadge("connected", "Firebase Cloud Synchronized");
+            return data;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 2. Try REST
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -199,13 +335,11 @@ export class CloudSyncEngine {
           return data;
         }
       }
-    } catch (e) {
-      console.warn("Firebase fetch full state warning:", e);
-    } finally {
+    } catch (e) {} finally {
       this.isSyncing = false;
     }
 
-    // Secondary: try /api/live-sync
+    // 3. Fallback to /api/live-sync
     try {
       const localRes = await fetch("/api/live-sync");
       if (localRes.ok) {
@@ -218,11 +352,11 @@ export class CloudSyncEngine {
     return this.cachedState;
   }
 
-  // 4. Save User Account to Firebase Cloud DB
+  // Save User Account
   async saveUser(user) {
     if (!user || !user.email) return;
 
-    this.updateStatusBadge("syncing", "Broadcasting account to Firebase Cloud...");
+    this.updateStatusBadge("syncing", "Saving account to Firebase Cloud...");
 
     try {
       let state = this.cachedState;
@@ -265,11 +399,11 @@ export class CloudSyncEngine {
     } catch (e) {}
   }
 
-  // 5. Delete User Account from Firebase Cloud DB
+  // Delete User Account
   async deleteUser(userId) {
     if (!userId) return;
 
-    this.updateStatusBadge("syncing", "Removing account across Firebase nodes...");
+    this.updateStatusBadge("syncing", "Removing account from Firebase Cloud...");
 
     try {
       let state = this.cachedState;
@@ -295,7 +429,6 @@ export class CloudSyncEngine {
       console.error("Failed to delete user from Firebase Cloud DB:", e);
     }
 
-    // Also notify serverless / Python server
     try {
       await fetch(`/api/users/${encodeURIComponent(userId)}`, {
         method: "DELETE"
@@ -303,7 +436,7 @@ export class CloudSyncEngine {
     } catch (e) {}
   }
 
-  // 6. Broadcast Full Workspace State Update to Firebase Cloud DB
+  // Broadcast Full State Update to Firebase
   async pushFullState(state) {
     if (!state) return;
 
@@ -311,7 +444,6 @@ export class CloudSyncEngine {
     this.lastLocalUpdateTime = state.updatedAt;
     this.cachedState = state;
 
-    // Debounce rapid calls (120ms) to ensure smooth atomic persistence
     if (this.pendingPushTimeout) {
       clearTimeout(this.pendingPushTimeout);
     }
@@ -334,6 +466,20 @@ export class CloudSyncEngine {
       updatedAt: state.updatedAt || Date.now()
     };
 
+    // 1. Try Firebase SDK set()
+    if (window.FirebaseSDK && this.firebaseApp) {
+      try {
+        const { getDatabase, ref, set } = window.FirebaseSDK;
+        const db = getDatabase(this.firebaseApp);
+        await set(ref(db, "meetpulse_state"), payload);
+        this.updateStatusBadge("connected", "Firebase Synced Live Worldwide");
+        return;
+      } catch (e) {
+        console.warn("Firebase SDK set fallback to REST:", e);
+      }
+    }
+
+    // 2. Try REST PUT
     try {
       const res = await fetch(`${this.firebaseUrl}/meetpulse_state.json`, {
         method: "PUT",
@@ -348,7 +494,7 @@ export class CloudSyncEngine {
       console.warn("Firebase state broadcast note:", e);
     }
 
-    // Also push to /api/live-sync
+    // Also notify /api/live-sync
     try {
       await fetch("/api/live-sync", {
         method: "POST",
@@ -358,14 +504,13 @@ export class CloudSyncEngine {
     } catch (e) {}
   }
 
-  // 7. Start Continuous Background Real-Time Polling & Verification Loop
+  // Continuous Synchronization Loop
   startSyncLoop(intervalMs = 3500, callback = null) {
     this.onUpdateCallback = callback;
 
     if (this.syncInterval) clearInterval(this.syncInterval);
 
     const performSync = async () => {
-      // Don't overwrite if local state was updated in the last 1.5s
       if (Date.now() - this.lastLocalUpdateTime < 1500) return;
 
       const remoteState = await this.fetchFullState();
@@ -374,12 +519,9 @@ export class CloudSyncEngine {
       }
     };
 
-    // Initial immediate fetch
     performSync();
-
     this.syncInterval = setInterval(performSync, intervalMs);
 
-    // Sync immediately whenever the window is focused or becomes visible
     window.addEventListener("focus", performSync);
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) performSync();
@@ -391,7 +533,7 @@ export class CloudSyncEngine {
       clearInterval(this.syncInterval);
       this.syncInterval = null;
     }
-    this.closeRealtimeStream();
+    this.closeListeners();
   }
 }
 

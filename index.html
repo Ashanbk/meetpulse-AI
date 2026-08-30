@@ -14,9 +14,14 @@
   <meta name="apple-mobile-web-app-title" content="Meetpulse">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
   <link rel="stylesheet" href="css/styles.css?v=2.5.0">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- Firebase Official Web SDK (v10) -->
+  <script type="module">
+    import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+    window.FirebaseSDK = { initializeApp, getApps, getApp, getDatabase, ref, set, get, onValue, update };
+  </script>
 </head>
 <body>
 
@@ -1074,18 +1079,18 @@
         <!-- Firebase Cloud Database Configuration -->
         <div class="form-group" style="margin-bottom: 0;">
           <label class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
-            <span>Firebase Realtime Database URL</span>
-            <span class="badge badge-primary" style="font-size: 0.65rem;">GLOBAL CLOUD SYNC</span>
+            <span>Firebase Config or Database URL</span>
+            <span class="badge badge-primary" style="font-size: 0.65rem;">SDK & CLOUD SYNC</span>
           </label>
-          <div style="display: flex; gap: 0.5rem;">
-            <input type="url" id="firebaseUrlInput" class="form-input" placeholder="https://your-project-default-rtdb.firebaseio.com">
-            <button type="button" id="testFirebaseConnBtn" class="btn btn-secondary btn-sm" style="flex-shrink: 0;">
-              Test Link
+          <textarea id="firebaseUrlInput" class="form-textarea" rows="3" placeholder='Paste your Firebase Database URL (e.g. https://your-project-default-rtdb.firebaseio.com) OR paste your Firebase Config snippet:&#10;const firebaseConfig = { apiKey: "...", databaseURL: "..." };'></textarea>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem; gap: 0.5rem;">
+            <div id="firebaseConnStatus" style="font-size: 0.76rem; flex: 1; display: none;"></div>
+            <button type="button" id="testFirebaseConnBtn" class="btn btn-secondary btn-sm" style="margin-left: auto;">
+              Test Connection
             </button>
           </div>
-          <div id="firebaseConnStatus" style="font-size: 0.76rem; margin-top: 5px; display: none;"></div>
           <small style="color: var(--text-muted); font-size: 0.76rem; margin-top: 5px; line-height: 1.45; display: block;">
-            Enables instant real-time live synchronization across all devices and phones worldwide using Firebase Realtime Database.
+            Paste the <strong>firebaseConfig</strong> object from Firebase Console or your <strong>Realtime Database URL</strong>.
           </small>
         </div>
 
