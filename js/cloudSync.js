@@ -1,11 +1,22 @@
 // js/cloudSync.js - Worldwide Real-Time Firebase Cloud Database Synchronizer & SDK Engine
-// Supports Official Firebase SDK (v10) + Server-Sent Events (SSE) + REST Realtime Sync
+// Connected to Live Firebase Project: meetpulse-eca9a
 
-const DEFAULT_FIREBASE_URL = "https://meetpulse-ai-cloud-default-rtdb.firebaseio.com";
+export const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCTucuolZPPtcx7IrZDC2RdrUtdf5hVz74",
+  authDomain: "meetpulse-eca9a.firebaseapp.com",
+  databaseURL: "https://meetpulse-eca9a-default-rtdb.firebaseio.com",
+  projectId: "meetpulse-eca9a",
+  storageBucket: "meetpulse-eca9a.firebasestorage.app",
+  messagingSenderId: "960021155031",
+  appId: "1:960021155031:web:42b867d0e45c5c7af7b492",
+  measurementId: "G-D0JD24NFYJ"
+};
+
+const DEFAULT_FIREBASE_URL = "https://meetpulse-eca9a-default-rtdb.firebaseio.com";
 
 export class CloudSyncEngine {
   constructor() {
-    this.firebaseConfig = null;
+    this.firebaseConfig = DEFAULT_FIREBASE_CONFIG;
     this.firebaseUrl = DEFAULT_FIREBASE_URL;
     this.dbRef = null;
     this.firebaseApp = null;
@@ -25,14 +36,19 @@ export class CloudSyncEngine {
   }
 
   loadStoredConfig() {
-    const raw = localStorage.getItem("meetpulse_firebase_config") || localStorage.getItem("meetpulse_firebase_url") || "";
-    this.parseAndSetConfig(raw);
+    const raw = localStorage.getItem("meetpulse_firebase_config") || localStorage.getItem("meetpulse_firebase_url");
+    if (raw) {
+      this.parseAndSetConfig(raw);
+    } else {
+      this.firebaseConfig = DEFAULT_FIREBASE_CONFIG;
+      this.firebaseUrl = DEFAULT_FIREBASE_URL;
+    }
   }
 
   parseAndSetConfig(rawInput) {
     if (!rawInput || !rawInput.trim()) {
+      this.firebaseConfig = DEFAULT_FIREBASE_CONFIG;
       this.firebaseUrl = DEFAULT_FIREBASE_URL;
-      this.firebaseConfig = null;
       return;
     }
 
@@ -42,12 +58,10 @@ export class CloudSyncEngine {
     if (input.includes("{") && input.includes("}")) {
       try {
         let jsonStr = input;
-        // Strip JS variable assignment if present (e.g. const firebaseConfig = { ... };)
         const match = input.match(/\{[\s\S]*\}/);
         if (match) {
           jsonStr = match[0];
         }
-        // Convert JS object keys without quotes to valid JSON
         jsonStr = jsonStr.replace(/(['"])?([a-zA-Z0-9_]+)(['"])?:/g, '"$2":').replace(/'/g, '"');
         const parsed = JSON.parse(jsonStr);
 
@@ -62,16 +76,15 @@ export class CloudSyncEngine {
           return;
         }
       } catch (e) {
-        // Fallback to regex extraction
         const dbUrlMatch = input.match(/databaseURL\s*:\s*["']([^"']+)["']/i);
         const projIdMatch = input.match(/projectId\s*:\s*["']([^"']+)["']/i);
         const apiKeyMatch = input.match(/apiKey\s*:\s*["']([^"']+)["']/i);
 
         if (dbUrlMatch || projIdMatch) {
           this.firebaseConfig = {
-            apiKey: apiKeyMatch ? apiKeyMatch[1] : "",
-            projectId: projIdMatch ? projIdMatch[1] : "",
-            databaseURL: dbUrlMatch ? dbUrlMatch[1] : (projIdMatch ? `https://${projIdMatch[1]}-default-rtdb.firebaseio.com` : "")
+            apiKey: apiKeyMatch ? apiKeyMatch[1] : DEFAULT_FIREBASE_CONFIG.apiKey,
+            projectId: projIdMatch ? projIdMatch[1] : DEFAULT_FIREBASE_CONFIG.projectId,
+            databaseURL: dbUrlMatch ? dbUrlMatch[1] : DEFAULT_FIREBASE_CONFIG.databaseURL
           };
           this.firebaseUrl = this.sanitizeUrl(this.firebaseConfig.databaseURL);
           localStorage.setItem("meetpulse_firebase_config", JSON.stringify(this.firebaseConfig));
@@ -107,6 +120,10 @@ export class CloudSyncEngine {
     return this.firebaseUrl || DEFAULT_FIREBASE_URL;
   }
 
+  getFirebaseUrl() {
+    return this.firebaseUrl || DEFAULT_FIREBASE_URL;
+  }
+
   initNetworkListeners() {
     window.addEventListener("online", () => {
       this.isOnline = true;
@@ -139,7 +156,7 @@ export class CloudSyncEngine {
     }
   }
 
-  // Initialize Firebase (SDK WebSocket if config available, else SSE Stream)
+  // Initialize Firebase (SDK WebSocket if available, else SSE Stream)
   initFirebase() {
     this.closeListeners();
 
@@ -164,15 +181,15 @@ export class CloudSyncEngine {
             }
           }
         }, (error) => {
-          console.warn("Firebase SDK onValue note:", error);
+          console.warn("Firebase SDK onValue fallback to SSE:", error);
           this.initSseStream();
         });
 
-        console.log("Firebase Official SDK Initialized successfully");
-        this.updateStatusBadge("connected", "Firebase SDK Connected");
+        console.log("Firebase Official SDK Initialized for project:", this.firebaseConfig.projectId);
+        this.updateStatusBadge("connected", "Firebase Live Connected");
         return;
       } catch (err) {
-        console.warn("Firebase SDK init fallback to SSE:", err);
+        console.warn("Firebase SDK init note:", err);
       }
     }
 

@@ -1,5 +1,5 @@
 // sw.js - Meetpulse PWA Service Worker (Firebase Realtime Cloud & Vercel compatible)
-const CACHE_NAME = 'meetpulse-cache-v6';
+const CACHE_NAME = 'meetpulse-cache-v7';
 
 const PRECACHE_ASSETS = [
   'index.html',
