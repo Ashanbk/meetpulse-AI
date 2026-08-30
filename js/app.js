@@ -1872,9 +1872,6 @@ class MeetPulseApp {
         </div>
         <div style="display: flex; align-items: center; gap: 0.35rem;">
           ${!m.isAdmin ? `
-            <button class="btn btn-secondary btn-sm" style="padding: 3px 8px; font-size: 0.72rem;" onclick="window.commitPulseApp.fillCredentials('${m.email}', '${m.password || 'employee123'}')" title="Autofill Login Credentials">
-              Autofill
-            </button>
             <button class="btn btn-danger btn-sm" style="padding: 3px 8px; font-size: 0.72rem; font-weight: 700;" onclick="window.commitPulseApp.deleteEmployee('${m.id}')" title="Delete Employee Account">
               Delete
             </button>
